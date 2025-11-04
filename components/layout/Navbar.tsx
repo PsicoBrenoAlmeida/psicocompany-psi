@@ -132,19 +132,19 @@ export default function Navbar() {
                 <>
                   <div className="navbar-center">
                     <Link 
-                      href="/dashboard" 
-                      className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}
-                      title="Minhas sessões e histórico"
+                      href="/perfil" 
+                      className={`nav-link ${isActive('/perfil') ? 'active' : ''}`}
+                      title="Ver meu perfil"
                     >
-                      Dashboard
+                      Meu perfil
                     </Link>
                     
                     <Link 
-                      href="/" 
-                      className={`nav-link ${isActive('/') ? 'active' : ''}`}
-                      title="Buscar psicólogos"
+                      href="/financeiro" 
+                      className={`nav-link ${isActive('/financeiro') ? 'active' : ''}`}
+                      title="Financeiro"
                     >
-                      Psicólogos
+                      Financeiro
                     </Link>
                   </div>
 
@@ -167,7 +167,7 @@ export default function Navbar() {
                       )}
                     </button>
 
-                    {dropdownOpen && (
+                      {dropdownOpen && (
                       <div className="dropdown-menu">
                         <div className="dropdown-header">
                           <div className="dropdown-name">
@@ -179,17 +179,21 @@ export default function Navbar() {
                         <div className="dropdown-divider"></div>
                         
                         <Link 
-                          href="/perfil" 
+                          href="/alterar-cadastro" 
                           className="dropdown-item"
                           onClick={() => setDropdownOpen(false)}
+                          style={{ textAlign: 'center' }}
                         >
-                          Meu Perfil
+                          Alterar cadastro
                         </Link>
+                        
+                        <div className="dropdown-divider"></div>
                         
                         <Link 
                           href="/configuracoes" 
                           className="dropdown-item"
                           onClick={() => setDropdownOpen(false)}
+                          style={{ textAlign: 'center' }}
                         >
                           Configurações
                         </Link>
@@ -490,18 +494,18 @@ export default function Navbar() {
         }
 
         .dropdown-item {
-          display: block;
-          padding: 12px 16px;
-          color: #2d1f3e;
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 500;
-          transition: all 0.2s ease;
-          background: none;
-          border: none;
-          width: 100%;
-          text-align: left;
-          cursor: pointer;
+        display: block;
+        padding: 12px 16px;
+        color: #2d1f3e;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        background: none;
+        border: none;
+        width: 100%;
+        text-align: center;
+        cursor: pointer;
         }
 
         .dropdown-item:hover {

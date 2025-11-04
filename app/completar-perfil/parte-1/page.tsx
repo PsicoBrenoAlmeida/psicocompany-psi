@@ -41,6 +41,7 @@ export default function CompletarPerfilParte1() {
   const [race, setRace] = useState('')
   const [sexualOrientation, setSexualOrientation] = useState('')
   const [pronouns, setPronouns] = useState('')
+  const [crpNumber, setCrpNumber] = useState('') // <-- NOVO STATE PARA O CRP
 
   // Listas de opções
   const specialtiesList = [
@@ -149,6 +150,7 @@ export default function CompletarPerfilParte1() {
         if (psychData.race) setRace(psychData.race)
         if (psychData.sexual_orientation) setSexualOrientation(psychData.sexual_orientation)
         if (psychData.pronouns) setPronouns(psychData.pronouns)
+        if (psychData.crp) setCrpNumber(psychData.crp) // <-- CARREGAR O CRP DO BANCO
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -273,7 +275,7 @@ export default function CompletarPerfilParte1() {
 
   const handleContinueToParte2 = async () => {
     console.log('🚀 INÍCIO')
-    
+
     if (!validateStep4()) {
       console.log('❌ Validação falhou')
       return
@@ -285,48 +287,67 @@ export default function CompletarPerfilParte1() {
     try {
       console.log('💾 SALVANDO...')
       console.log('👤 userId:', userId)
+      if (!userId) throw new Error('Usuário não identificado')
 
-      if (!userId) {
-        throw new Error('userId vazio')
-      }
+      const price = Number(pricePerSession)
+      const duration = Number(sessionDuration || 50)
+      if (!Number.isFinite(price) || price <= 0) throw new Error('Valor da sessão inválido')
 
       const updateData = {
         specialties,
-        approach: approaches[0] || '',
-        approaches: approaches,
-        price_per_session: parseFloat(pricePerSession),
-        session_duration: parseInt(sessionDuration),
+        approaches,
+        price_per_session: price,
+        session_duration: duration,
         short_bio: shortBio,
         full_bio: fullBio,
         education_list: educationList,
         race,
         sexual_orientation: sexualOrientation,
-        pronouns
+        pronouns,
+        crp: crpNumber, // <-- INCLUIR O CRP NO SALVAMENTO
       }
 
       console.log('📦 Dados:', updateData)
-      console.log('⏳ Fazendo update...')
 
-      // Fazer update direto sem timeout - mais simples
-      const { data, error } = await supabase
+      // 🔎 Checagem de existência
+      console.log('🔎 Verificando se já existe registro do psicólogo...')
+      const { data: existing, error: checkErr } = await supabase
         .from('psychologists')
-        .update(updateData)
+        .select('user_id')
         .eq('user_id', userId)
-        .select()
+        .maybeSingle()
 
-      console.log('✅ Resposta recebida!')
-      console.log('📤 data:', data)
-      console.log('📤 error:', error)
+      if (checkErr) {
+        console.error('❌ Erro ao checar existência:', checkErr)
+        throw checkErr
+      }
+      console.log('🔎 Existe?', !!existing)
 
-      if (error) {
-        console.error('❌ Erro do Supabase:', error)
-        throw new Error(`${error.message}${error.details ? ` - ${error.details}` : ''}`)
+      let data, error
+
+      if (!existing) {
+        console.log('🆕 Inserindo registro...')
+        const insertPayload = { user_id: userId, ...updateData }
+
+        ;({ data, error } = await supabase
+          .from('psychologists')
+          .insert([insertPayload])
+          .select()
+          .single())
+      } else {
+        console.log('✏️ Atualizando registro...')
+        ;({ data, error } = await supabase
+          .from('psychologists')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select()
+          .single())
       }
 
-      if (!data || data.length === 0) {
-        console.warn('⚠️ Nenhum registro foi atualizado')
-        throw new Error('Nenhum registro foi atualizado. Verifique suas permissões ou entre em contato com o suporte.')
-      }
+      console.log('✅ Resposta recebida!', { data, error })
+
+      if (error) throw error
+      if (!data) throw new Error('Nenhum registro foi salvo/atualizado (verifique policies e user_id).')
 
       console.log('🎉 SUCESSO!')
       setMessage({ type: 'success', text: 'Dados salvos com sucesso!' })
@@ -334,25 +355,45 @@ export default function CompletarPerfilParte1() {
       setTimeout(() => {
         console.log('➡️ Redirecionando para Parte 2...')
         router.push('/completar-perfil/parte-2')
-      }, 1500)
+      }, 1200)
 
     } catch (error: any) {
       console.error('🔴 ERRO COMPLETO:', error)
-      
-      let errorMessage = 'Erro ao salvar os dados. '
-      
-      if (error.message?.includes('JWT')) {
-        errorMessage += 'Sua sessão expirou. Por favor, faça login novamente.'
-        setTimeout(() => router.push('/login'), 2000)
-      } else if (error.message?.includes('permission') || error.message?.includes('policy')) {
-        errorMessage += 'Você não tem permissão para atualizar estes dados. Entre em contato com o suporte.'
-      } else if (error.message) {
-        errorMessage += error.message
+
+      let msg = 'Erro ao salvar: '
+      if (error?.message?.toLowerCase?.().includes('jwt')) {
+        msg = 'Sua sessão expirou. Faça login novamente.'
+        setTimeout(() => router.push('/login'), 1500)
+      } else if (
+        error?.message?.toLowerCase?.().includes('permission') ||
+        error?.message?.toLowerCase?.().includes('policy') ||
+        error?.code === 'PGRST301'
+      ) {
+        msg = 'Você não tem permissão. Verifique as policies de RLS da tabela psychologists.'
+      } else if (
+        error?.code === '23505' ||
+        error?.message?.toLowerCase?.().includes('unique') ||
+        error?.message?.toLowerCase?.().includes('duplicate')
+      ) {
+        msg = 'Violação de unicidade. Verifique UNIQUE em user_id ou registros duplicados.'
+      } else if (
+        error?.code === '23502' ||
+        error?.message?.toLowerCase?.().includes('not null')
+      ) {
+        msg = 'Erro de Preenchimento: Um campo obrigatório não foi enviado. Verifique o console.'
+      } else if (
+        error?.message?.toLowerCase?.().includes('column') &&
+        error?.message?.toLowerCase?.().includes('does not exist')
+      ) {
+        msg = 'Coluna inexistente no payload. Confira nomes e tipos das colunas.'
+      } else if (error?.message) {
+        msg += error.message
       } else {
-        errorMessage += 'Tente novamente em alguns instantes.'
+        msg += 'Tente novamente.'
       }
-      
-      setMessage({ type: 'error', text: errorMessage })
+
+      setMessage({ type: 'error', text: msg })
+    } finally {
       setLoading(false)
     }
   }
