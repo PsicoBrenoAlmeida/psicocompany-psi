@@ -21,7 +21,7 @@ interface PsychologistData {
   price_per_session: number
   short_bio: string
   full_bio: string
-  education_list: any[]
+  education_list: string[]
   race: string
   sexual_orientation: string
   pronouns: string

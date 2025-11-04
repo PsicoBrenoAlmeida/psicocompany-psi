@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabaseClient'
@@ -65,13 +65,11 @@ export default function AlterarCadastroPage() {
   // Documentos
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const [crpUrl, setCrpUrl] = useState<string | null>(null)
   const [crpPreview, setCrpPreview] = useState<string | null>(null)
-  const [crpFile, setCrpFile] = useState<File | null>(null)
   const [uploadingCrp, setUploadingCrp] = useState(false)
   const crpInputRef = useRef<HTMLInputElement>(null)
 
@@ -160,11 +158,7 @@ export default function AlterarCadastroPage() {
     'Libras'
   ]
 
-  useEffect(() => {
-    loadUserData()
-  }, [])
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     try {
       setInitialLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -247,7 +241,11 @@ export default function AlterarCadastroPage() {
     } finally {
       setInitialLoading(false)
     }
-  }
+  }, [router, supabase])
+
+  useEffect(() => {
+    loadUserData()
+  }, [loadUserData])
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '')
@@ -349,13 +347,12 @@ export default function AlterarCadastroPage() {
       }
       reader.readAsDataURL(file)
       
-      setAvatarFile(file)
       setMessage(null)
       
       await uploadAvatar(file)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message })
-      setAvatarFile(null)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar arquivo'
+      setMessage({ type: 'error', text: errorMessage })
       setAvatarPreview(avatarUrl)
     }
   }
@@ -399,10 +396,10 @@ export default function AlterarCadastroPage() {
       setMessage({ type: 'success', text: '✓ Foto atualizada!' })
       setTimeout(() => setMessage(null), 3000)
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao fazer upload:', error)
-      setMessage({ type: 'error', text: error.message || 'Erro ao enviar foto' })
-      setAvatarFile(null)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao enviar foto'
+      setMessage({ type: 'error', text: errorMessage })
       setAvatarPreview(avatarUrl)
     } finally {
       setUploadingAvatar(false)
@@ -432,13 +429,12 @@ export default function AlterarCadastroPage() {
         setCrpPreview('PDF')
       }
       
-      setCrpFile(file)
       setMessage(null)
       
       await uploadCrp(file)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message })
-      setCrpFile(null)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar arquivo'
+      setMessage({ type: 'error', text: errorMessage })
       setCrpPreview(crpUrl)
     }
   }
@@ -484,10 +480,10 @@ export default function AlterarCadastroPage() {
       setMessage({ type: 'success', text: '✓ Documento atualizado!' })
       setTimeout(() => setMessage(null), 3000)
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao fazer upload:', error)
-      setMessage({ type: 'error', text: error.message || 'Erro ao enviar documento' })
-      setCrpFile(null)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao enviar documento'
+      setMessage({ type: 'error', text: errorMessage })
       setCrpPreview(crpUrl)
     } finally {
       setUploadingCrp(false)
@@ -553,11 +549,12 @@ export default function AlterarCadastroPage() {
         setMessage(null)
       }, 3000)
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('🔴 ERRO:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar alterações'
       setMessage({ 
         type: 'error', 
-        text: error.message || 'Erro ao salvar alterações'
+        text: errorMessage
       })
     } finally {
       setLoading(false)

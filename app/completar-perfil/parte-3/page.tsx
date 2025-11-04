@@ -128,8 +128,9 @@ export default function CompletarPerfilParte3() {
       
       // Upload automático
       await uploadAvatar(file)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar arquivo'
+      setMessage({ type: 'error', text: errorMessage })
       setAvatarFile(null)
       setAvatarPreview(null)
     }
@@ -152,7 +153,7 @@ export default function CompletarPerfilParte3() {
       }
 
       // Upload
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -178,9 +179,10 @@ export default function CompletarPerfilParte3() {
 
       setMessage({ type: 'success', text: '✓ Foto enviada com sucesso!' })
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao fazer upload:', error)
-      setMessage({ type: 'error', text: error.message || 'Erro ao enviar foto' })
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao enviar foto'
+      setMessage({ type: 'error', text: errorMessage })
       setAvatarFile(null)
       setAvatarPreview(null)
     } finally {
@@ -213,8 +215,9 @@ export default function CompletarPerfilParte3() {
       
       // Upload automático
       await uploadCrp(file)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar arquivo'
+      setMessage({ type: 'error', text: errorMessage })
       setCrpFile(null)
       setCrpPreview(null)
     }
@@ -264,9 +267,10 @@ export default function CompletarPerfilParte3() {
 
       setMessage({ type: 'success', text: '✓ Documento enviado com sucesso!' })
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao fazer upload:', error)
-      setMessage({ type: 'error', text: error.message || 'Erro ao enviar documento' })
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao enviar documento'
+      setMessage({ type: 'error', text: errorMessage })
       setCrpFile(null)
       setCrpPreview(null)
     } finally {
@@ -369,7 +373,7 @@ export default function CompletarPerfilParte3() {
 
       console.log('🚀 FINALIZANDO CADASTRO...')
 
-      const updateData: any = {
+      const updateData = {
         plan_type: selectedPlan,
         monthly_fee: selectedPlan === 'premium' ? 300 : null,
         commission_rate: selectedPlan === 'basic' ? 0.20 : 0.00,
@@ -398,11 +402,12 @@ export default function CompletarPerfilParte3() {
         router.push('/dashboard')
       }, 2500)
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('🔴 ERRO:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao finalizar cadastro'
       setMessage({ 
         type: 'error', 
-        text: error.message || 'Erro ao finalizar cadastro'
+        text: errorMessage
       })
     } finally {
       setLoading(false)
@@ -667,7 +672,7 @@ export default function CompletarPerfilParte3() {
                       <ul className="plan-features">
                         <li>✓ <strong>Sem comissão por sessão</strong></li>
                         <li>✓ <strong>Destaque nas buscas</strong></li>
-                        <li>✓ Badge "Premium" no perfil</li>
+                        <li>✓ Badge &quot;Premium&quot; no perfil</li>
                         <li>✓ Até 10 áreas de especialização</li>
                         <li>✓ Até 5 abordagens terapêuticas</li>
                         <li>✓ Atendimento online, presencial ou híbrido</li>
@@ -711,7 +716,7 @@ export default function CompletarPerfilParte3() {
                       <div className="success-icon">✓</div>
                       <div>
                         <h4>Tudo pronto! Seu cadastro está completo</h4>
-                        <p>Plano <strong>{selectedPlan === 'premium' ? 'Premium' : 'Essencial'}</strong> selecionado. Clique em "Enviar para Aprovação" para finalizar.</p>
+                        <p>Plano <strong>{selectedPlan === 'premium' ? 'Premium' : 'Essencial'}</strong> selecionado. Clique em &quot;Enviar para Aprovação&quot; para finalizar.</p>
                       </div>
                     </div>
                   )}

@@ -107,7 +107,7 @@ export default function FinanceiroPage() {
 
       // Calcular período baseado no filtro
       const now = new Date()
-      let startDate = new Date()
+      const startDate = new Date()
       
       if (filterPeriod === 'month') {
         startDate.setMonth(now.getMonth() - 1)
@@ -328,7 +328,7 @@ export default function FinanceiroPage() {
             <div className="header-actions">
               <select 
                 value={filterPeriod}
-                onChange={(e) => setFilterPeriod(e.target.value as any)}
+                onChange={(e) => setFilterPeriod(e.target.value as 'month' | 'quarter' | 'year')}
                 className="period-select"
               >
                 <option value="month">Último mês</option>

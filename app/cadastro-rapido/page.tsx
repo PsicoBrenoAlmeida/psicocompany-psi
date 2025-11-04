@@ -173,15 +173,14 @@ export default function CadastroRapidoPage() {
         router.push('/dashboard')
       }, 1500)
 
-    } catch (error: any) {
-      console.error('🔴 ERRO:', error)
-      setMessage({ 
-        type: 'error', 
-        text: error.message || 'Erro ao criar conta. Tente novamente.'
-      })
-    } finally {
-      setLoading(false)
-    }
+    } catch (error) {
+  console.error('🔴 ERRO:', error)
+  const errorMessage = error instanceof Error ? error.message : 'Erro ao criar conta. Tente novamente.'
+  setMessage({ 
+    type: 'error', 
+    text: errorMessage
+  })
+  }
   }
 
   return (

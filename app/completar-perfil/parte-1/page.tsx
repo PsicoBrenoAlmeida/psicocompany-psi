@@ -357,42 +357,50 @@ export default function CompletarPerfilParte1() {
         router.push('/completar-perfil/parte-2')
       }, 1200)
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('🔴 ERRO COMPLETO:', error)
 
-      let msg = 'Erro ao salvar: '
-      if (error?.message?.toLowerCase?.().includes('jwt')) {
-        msg = 'Sua sessão expirou. Faça login novamente.'
-        setTimeout(() => router.push('/login'), 1500)
-      } else if (
-        error?.message?.toLowerCase?.().includes('permission') ||
-        error?.message?.toLowerCase?.().includes('policy') ||
-        error?.code === 'PGRST301'
-      ) {
-        msg = 'Você não tem permissão. Verifique as policies de RLS da tabela psychologists.'
-      } else if (
-        error?.code === '23505' ||
-        error?.message?.toLowerCase?.().includes('unique') ||
-        error?.message?.toLowerCase?.().includes('duplicate')
-      ) {
-        msg = 'Violação de unicidade. Verifique UNIQUE em user_id ou registros duplicados.'
-      } else if (
-        error?.code === '23502' ||
-        error?.message?.toLowerCase?.().includes('not null')
-      ) {
-        msg = 'Erro de Preenchimento: Um campo obrigatório não foi enviado. Verifique o console.'
-      } else if (
-        error?.message?.toLowerCase?.().includes('column') &&
-        error?.message?.toLowerCase?.().includes('does not exist')
-      ) {
-        msg = 'Coluna inexistente no payload. Confira nomes e tipos das colunas.'
-      } else if (error?.message) {
-        msg += error.message
-      } else {
-        msg += 'Tente novamente.'
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar'
+let msg = 'Erro ao salvar: '
 
-      setMessage({ type: 'error', text: msg })
+if (typeof error === 'object' && error !== null) {
+  const err = error as { message?: string; code?: string }
+  
+  if (err.message?.toLowerCase?.().includes('jwt')) {
+    msg = 'Sua sessão expirou. Faça login novamente.'
+    setTimeout(() => router.push('/login'), 1500)
+  } else if (
+    err.message?.toLowerCase?.().includes('permission') ||
+    err.message?.toLowerCase?.().includes('policy') ||
+    err.code === 'PGRST301'
+  ) {
+    msg = 'Você não tem permissão. Verifique as policies de RLS da tabela psychologists.'
+  } else if (
+    err.code === '23505' ||
+    err.message?.toLowerCase?.().includes('unique') ||
+    err.message?.toLowerCase?.().includes('duplicate')
+  ) {
+    msg = 'Violação de unicidade. Verifique UNIQUE em user_id ou registros duplicados.'
+  } else if (
+    err.code === '23502' ||
+    err.message?.toLowerCase?.().includes('not null')
+  ) {
+    msg = 'Erro de Preenchimento: Um campo obrigatório não foi enviado. Verifique o console.'
+  } else if (
+    err.message?.toLowerCase?.().includes('column') &&
+    err.message?.toLowerCase?.().includes('does not exist')
+  ) {
+    msg = 'Coluna inexistente no payload. Confira nomes e tipos das colunas.'
+  } else if (err.message) {
+    msg += err.message
+  } else {
+    msg += 'Tente novamente.'
+  }
+} else {
+  msg += errorMessage
+}
+
+setMessage({ type: 'error', text: msg })
     } finally {
       setLoading(false)
     }

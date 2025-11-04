@@ -173,7 +173,7 @@ export default function CompletarPerfilParte2() {
 
       console.log('💾 Salvando Parte 2...')
 
-      const updateData: any = {
+      const updateData = {
         age_groups: ageGroups,
         modality: modality,
         city: city || null,
@@ -202,13 +202,14 @@ export default function CompletarPerfilParte2() {
       // Redirecionar para Parte 3
       router.push('/completar-perfil/parte-3')
 
-    } catch (error: any) {
-      console.error('🔴 ERRO:', error)
-      setMessage({ 
-        type: 'error', 
-        text: error.message || 'Erro ao salvar dados'
-      })
-    } finally {
+    } catch (error) {
+  console.error('🔴 ERRO:', error)
+  const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar dados'
+  setMessage({ 
+    type: 'error', 
+    text: errorMessage
+  })
+} finally {
       setLoading(false)
     }
   }
