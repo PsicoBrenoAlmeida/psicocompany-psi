@@ -18,6 +18,10 @@ export default function CadastroRapidoPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [crp, setCrp] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '')
@@ -28,10 +32,10 @@ export default function CadastroRapidoPage() {
   }
 
   const formatCRP = (value: string) => {
-  const numbers = value.replace(/\D/g, '')
-  if (numbers.length <= 2) return numbers
-  return `${numbers.slice(0, 2)}/${numbers.slice(2, 8)}` // Permite até 8 dígitos (2 + 6)
-}
+    const numbers = value.replace(/\D/g, '')
+    if (numbers.length <= 2) return numbers
+    return `${numbers.slice(0, 2)}/${numbers.slice(2, 8)}`
+  }
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -59,6 +63,16 @@ export default function CadastroRapidoPage() {
       return false
     }
 
+    if (password.length < 6) {
+      setMessage({ type: 'error', text: 'Senha deve ter no mínimo 6 caracteres' })
+      return false
+    }
+
+    if (password !== confirmPassword) {
+      setMessage({ type: 'error', text: 'As senhas não coincidem' })
+      return false
+    }
+
     return true
   }
 
@@ -69,49 +83,101 @@ export default function CadastroRapidoPage() {
       setLoading(true)
       setMessage(null)
 
-      console.log('🚀 Iniciando salvamento...')
-      console.log('📋 Dados:', { fullName, email, phone, crp })
+      console.log('🚀 INICIANDO CADASTRO RÁPIDO')
 
-      // Salvar lead no banco (tabela psychologist_leads)
-      const { data, error: leadError } = await supabase
+      // 1. Criar usuário no Supabase Auth
+      console.log('👤 Criando usuário...')
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            user_type: 'psychologist'
+          }
+        }
+      })
+
+      if (authError) {
+        console.error('❌ Erro no Auth:', authError)
+        throw authError
+      }
+      if (!authData.user) {
+        throw new Error('Erro ao criar usuário')
+      }
+
+      console.log('✅ Usuário criado:', authData.user.id)
+
+      // 2. Criar perfil básico
+      console.log('📝 Criando perfil...')
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: authData.user.id,
+          user_type: 'psychologist',
+          full_name: fullName,
+          email: email,
+          phone: phone
+        })
+
+      if (profileError) {
+        console.error('❌ Erro no Profile:', profileError)
+        throw profileError
+      }
+
+      console.log('✅ Perfil criado')
+
+      // 3. Criar registro básico de psicólogo (dados mínimos)
+      console.log('🧠 Criando registro de psicólogo...')
+      const { error: psychologistError } = await supabase
+        .from('psychologists')
+        .insert({
+          user_id: authData.user.id,
+          crp: crp,
+          specialties: [],
+          approach: '',
+          price_per_session: 0,
+          short_bio: '',
+          approval_status: 'pending',
+          is_active: false,
+          plan_type: 'basic'
+        })
+
+      if (psychologistError) {
+        console.error('❌ Erro no Psychologist:', psychologistError)
+        throw psychologistError
+      }
+
+      console.log('✅ Psicólogo criado')
+
+      // 4. Salvar lead (opcional, para tracking)
+      await supabase
         .from('psychologist_leads')
         .insert({
           full_name: fullName,
           email: email,
           phone: phone,
           crp: crp,
-          status: 'pending'
+          status: 'converted'
         })
 
-      console.log('📥 Resposta do Supabase:', { data, error: leadError })
-
-      if (leadError) {
-        console.error('❌ Erro detalhado do Supabase:', {
-          message: leadError.message,
-          details: leadError.details,
-          hint: leadError.hint,
-          code: leadError.code
-        })
-        throw new Error(`Erro ao salvar: ${leadError.message}`)
-      }
-
-      console.log('✅ Lead salvo com sucesso!')
+      console.log('✅ CADASTRO CONCLUÍDO - REDIRECIONANDO')
 
       setMessage({ 
         type: 'success', 
-        text: 'Dados salvos! Redirecionando para completar cadastro...' 
+        text: 'Conta criada! Redirecionando...' 
       })
 
-      // Redirecionar para o cadastro completo com os dados preenchidos
+      // 5. Redirecionar para dashboard (já está logado automaticamente)
       setTimeout(() => {
-        router.push(`/cadastro-completo?email=${encodeURIComponent(email)}&name=${encodeURIComponent(fullName)}&phone=${encodeURIComponent(phone)}&crp=${encodeURIComponent(crp)}`)
-      }, 2000)
+        router.push('/dashboard')
+      }, 1500)
 
     } catch (error: any) {
-      console.error('🔴 ERRO FINAL:', error)
+      console.error('🔴 ERRO:', error)
       setMessage({ 
         type: 'error', 
-        text: error.message || 'Erro ao salvar dados. Veja o console para detalhes.'
+        text: error.message || 'Erro ao criar conta. Tente novamente.'
       })
     } finally {
       setLoading(false)
@@ -121,7 +187,6 @@ export default function CadastroRapidoPage() {
   return (
     <>
       <div className="cadastro-rapido-page">
-        {/* Decorações de fundo */}
         <div className="bg-decoration bg-decoration-1"></div>
         <div className="bg-decoration bg-decoration-2"></div>
         
@@ -133,33 +198,33 @@ export default function CadastroRapidoPage() {
             </Link>
             <div className="badge-pro">👨‍⚕️ Para Psicólogos</div>
             <h2 className="branding-title">
-              Transforme sua prática em <span className="gradient-text">consultório digital</span>
+              Crie sua conta e comece em <span className="gradient-text">2 minutos</span>
             </h2>
             <p className="branding-subtitle">
-              Comece seu cadastro agora e tenha acesso a uma plataforma completa 
-              para atender seus pacientes online.
+              Cadastre-se agora e tenha acesso imediato à plataforma. 
+              Complete seu perfil depois com calma.
             </p>
             
             <div className="features">
               <div className="feature">
-                <div className="feature-icon">💼</div>
+                <div className="feature-icon">⚡</div>
                 <div>
-                  <h3>Gestão Completa</h3>
-                  <p>Agenda, prontuários e pagamentos em um só lugar</p>
+                  <h3>Acesso Imediato</h3>
+                  <p>Entre na plataforma em menos de 2 minutos</p>
                 </div>
               </div>
               <div className="feature">
-                <div className="feature-icon">💰</div>
+                <div className="feature-icon">📋</div>
                 <div>
-                  <h3>Receba por Pix</h3>
-                  <p>Pagamentos rápidos e seguros direto na sua conta</p>
+                  <h3>Complete Depois</h3>
+                  <p>Adicione seus dados profissionais com calma</p>
                 </div>
               </div>
               <div className="feature">
-                <div className="feature-icon">🎯</div>
+                <div className="feature-icon">✅</div>
                 <div>
-                  <h3>Pacientes Qualificados</h3>
-                  <p>Conecte-se com quem realmente precisa de ajuda</p>
+                  <h3>Aprovação Rápida</h3>
+                  <p>Validamos seu CRP e liberamos seu perfil</p>
                 </div>
               </div>
             </div>
@@ -168,21 +233,9 @@ export default function CadastroRapidoPage() {
           {/* Lado direito - Formulário */}
           <div className="form-side">
             <div className="cadastro-card">
-              <div className="progress-bar">
-                <div className="progress-step active">
-                  <div className="step-circle">1</div>
-                  <span>Dados básicos</span>
-                </div>
-                <div className="progress-line"></div>
-                <div className="progress-step">
-                  <div className="step-circle">2</div>
-                  <span>Cadastro completo</span>
-                </div>
-              </div>
-
               <div className="form-header">
-                <h2 className="form-title">Comece seu cadastro</h2>
-                <p className="form-subtitle">Preencha seus dados básicos para começar</p>
+                <h2 className="form-title">Criar conta gratuita</h2>
+                <p className="form-subtitle">Preencha os dados para começar</p>
               </div>
 
               <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
@@ -205,7 +258,7 @@ export default function CadastroRapidoPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
-                  <span className="hint">Usaremos para login e comunicações</span>
+                  <span className="hint">Será usado para login</span>
                 </div>
 
                 <div className="form-group">
@@ -217,11 +270,10 @@ export default function CadastroRapidoPage() {
                     onChange={(e) => setPhone(formatPhone(e.target.value))}
                     maxLength={15}
                   />
-                  <span className="hint">Para contato e confirmações</span>
                 </div>
 
                 <div className="form-group">
-                  <label>CRP (Conselho Regional de Psicologia) *</label>
+                  <label>CRP *</label>
                   <input
                     type="text"
                     placeholder="06/123456"
@@ -232,7 +284,45 @@ export default function CadastroRapidoPage() {
                   <span className="hint">Será verificado para aprovação</span>
                 </div>
 
-                {/* Mensagem */}
+                <div className="form-group">
+                  <label>Senha *</label>
+                  <div className="password-input">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
+                  <span className="hint">Mínimo de 6 caracteres</span>
+                </div>
+
+                <div className="form-group">
+                  <label>Confirmar senha *</label>
+                  <div className="password-input">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
+                </div>
+
                 {message && (
                   <div className={`message ${message.type}`}>
                     {message.type === 'success' ? '✓' : '⚠'} {message.text}
@@ -247,11 +337,11 @@ export default function CadastroRapidoPage() {
                   {loading ? (
                     <>
                       <div className="btn-spinner"></div>
-                      Salvando...
+                      Criando conta...
                     </>
                   ) : (
                     <>
-                      Continuar cadastro
+                      Criar conta gratuita
                       <span>→</span>
                     </>
                   )}
@@ -265,8 +355,8 @@ export default function CadastroRapidoPage() {
                   <line x1="12" y1="8" x2="12.01" y2="8"></line>
                 </svg>
                 <p>
-                  Seus dados estão seguros e serão usados apenas para validação 
-                  profissional e comunicação sobre a plataforma.
+                  Ao criar conta, você concorda com nossos{' '}
+                  <Link href="/termos" target="_blank" className="link">Termos de Uso</Link>
                 </p>
               </div>
 
@@ -291,7 +381,6 @@ export default function CadastroRapidoPage() {
           padding: 80px 24px 40px;
         }
 
-        /* Decorações de fundo */
         .bg-decoration {
           position: absolute;
           border-radius: 50%;
@@ -320,7 +409,6 @@ export default function CadastroRapidoPage() {
           66% { transform: translate(-20px, 20px) scale(0.95); }
         }
 
-        /* Container principal */
         .cadastro-container {
           width: 100%;
           max-width: 1200px;
@@ -333,7 +421,6 @@ export default function CadastroRapidoPage() {
           z-index: 1;
         }
 
-        /* Lado esquerdo - Branding */
         .branding-side {
           padding: 32px;
           animation: slideInLeft 0.8s ease;
@@ -459,7 +546,6 @@ export default function CadastroRapidoPage() {
           line-height: 1.4;
         }
 
-        /* Lado direito - Formulário */
         .form-side {
           padding: 32px;
           display: flex;
@@ -498,58 +584,6 @@ export default function CadastroRapidoPage() {
           height: 4px;
           background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
           border-radius: 20px 20px 0 0;
-        }
-
-        /* Progress Bar */
-        .progress-bar {
-          display: flex;
-          align-items: center;
-          margin-bottom: 32px;
-        }
-
-        .progress-step {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-          flex: 1;
-        }
-
-        .step-circle {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: rgba(124, 101, 181, 0.1);
-          color: #9b8fab;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          font-size: 14px;
-          transition: all 0.3s ease;
-        }
-
-        .progress-step.active .step-circle {
-          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
-          color: white;
-        }
-
-        .progress-step span {
-          font-size: 12px;
-          color: #9b8fab;
-          font-weight: 600;
-        }
-
-        .progress-step.active span {
-          color: #7c65b5;
-        }
-
-        .progress-line {
-          height: 2px;
-          flex: 1;
-          background: rgba(124, 101, 181, 0.2);
-          margin: 0 8px;
-          margin-bottom: 28px;
         }
 
         .form-header {
@@ -597,6 +631,32 @@ export default function CadastroRapidoPage() {
           box-shadow: 0 0 0 4px rgba(124, 101, 181, 0.1);
         }
 
+        .password-input {
+          position: relative;
+        }
+
+        .password-input input {
+          padding-right: 48px;
+        }
+
+        .toggle-password {
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 18px;
+          padding: 4px;
+          opacity: 0.6;
+          transition: opacity 0.2s ease;
+        }
+
+        .toggle-password:hover {
+          opacity: 1;
+        }
+
         .hint {
           display: block;
           font-size: 12px;
@@ -625,6 +685,16 @@ export default function CadastroRapidoPage() {
           font-size: 13px;
           color: #6b5d7a;
           line-height: 1.5;
+        }
+
+        .link {
+          color: #7c65b5;
+          text-decoration: none;
+          font-weight: 600;
+        }
+
+        .link:hover {
+          text-decoration: underline;
         }
 
         .message {
@@ -731,7 +801,6 @@ export default function CadastroRapidoPage() {
           background: rgba(124, 101, 181, 0.05);
         }
 
-        /* Responsivo */
         @media (max-width: 968px) {
           .cadastro-container {
             grid-template-columns: 1fr;
@@ -777,10 +846,6 @@ export default function CadastroRapidoPage() {
 
           .cadastro-card {
             padding: 32px 24px;
-          }
-
-          .progress-step span {
-            font-size: 11px;
           }
         }
       `}</style>

@@ -121,7 +121,7 @@ export default function Navbar() {
                   <Link href="/login" className="btn-login">
                     Entrar
                   </Link>
-                  <Link href="/signup" className="btn-signup">
+                  <Link href="/cadastro-rapido" className="btn-signup">
                     Criar conta
                   </Link>
                 </div>

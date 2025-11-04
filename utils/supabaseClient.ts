@@ -1,16 +1,9 @@
 // utils/supabaseClient.ts
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/types/database.types'
-
-let supabaseInstance: ReturnType<typeof createPagesBrowserClient<Database>> | null = null
+import { createBrowserClient } from '@supabase/ssr'
 
 export const createClient = () => {
-  if (supabaseInstance) {
-    return supabaseInstance
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
   console.log('🔑 Supabase URL:', supabaseUrl)
   console.log('🔑 Supabase Key existe?', supabaseKey ? 'SIM' : 'NÃO')
@@ -20,10 +13,6 @@ export const createClient = () => {
     throw new Error('Configuração do Supabase está incompleta')
   }
 
-  supabaseInstance = createPagesBrowserClient<Database>({
-    supabaseUrl,
-    supabaseKey,
-  })
-
-  return supabaseInstance
+  // Criar cliente sem tipagem genérica (para evitar problemas de tipos)
+  return createBrowserClient(supabaseUrl, supabaseKey)
 }

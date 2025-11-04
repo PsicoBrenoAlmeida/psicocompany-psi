@@ -1,4 +1,3 @@
-// app/dashboard/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -13,27 +12,50 @@ interface Profile {
   avatar_url?: string
 }
 
+interface PsychologistData {
+  id: string
+  crp: string
+  specialties: string[]
+  approach: string
+  approaches: string[]
+  price_per_session: number
+  short_bio: string
+  full_bio: string
+  education_list: any[]
+  race: string
+  sexual_orientation: string
+  pronouns: string
+  age_groups: string[]
+  modality: string[]
+  languages: string[]
+  pix_key: string
+  avatar_url?: string
+  crp_document_url?: string
+  plan_type: string
+  approval_status: string
+  is_active: boolean
+  rating: number
+  total_reviews: number
+}
+
 interface Appointment {
   id: string
   appointment_date: string
   appointment_time: string
   status: string
-  psychologist?: {
-    full_name: string
-    avatar_url?: string
-    specialties: string[]
-  }
   patient?: {
     full_name: string
     avatar_url?: string
   }
 }
 
-interface PsychologistStats {
-  total_sessions: number
-  upcoming_sessions: number
-  rating: number
-  total_reviews: number
+interface ProfileCompletion {
+  isComplete: boolean
+  percentage: number
+  missing: string[]
+  parte1Complete: boolean
+  parte2Complete: boolean
+  parte3Complete: boolean
 }
 
 export default function DashboardPage() {
@@ -41,9 +63,17 @@ export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [psychologistData, setPsychologistData] = useState<PsychologistData | null>(null)
   const [loading, setLoading] = useState(true)
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [stats, setStats] = useState<PsychologistStats | null>(null)
+  const [profileCompletion, setProfileCompletion] = useState<ProfileCompletion>({
+    isComplete: false,
+    percentage: 0,
+    missing: [],
+    parte1Complete: false,
+    parte2Complete: false,
+    parte3Complete: false
+  })
 
   useEffect(() => {
     checkUser()
@@ -61,19 +91,16 @@ export default function DashboardPage() {
 
       setUser(user)
 
-      // Buscar perfil
       const { data: profileData } = await supabase
         .from('profiles')
         .select('user_type, full_name, avatar_url')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
       if (profileData) {
         setProfile(profileData)
         
-        if (profileData.user_type === 'patient') {
-          await loadPatientData(user.id)
-        } else {
+        if (profileData.user_type === 'psychologist') {
           await loadPsychologistData(user.id)
         }
       }
@@ -84,80 +111,19 @@ export default function DashboardPage() {
     }
   }
 
-  const loadPatientData = async (userId: string) => {
-    try {
-      // Buscar ID do paciente
-      const { data: patientData } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('user_id', userId)
-        .single()
-
-      if (!patientData) return
-
-      // Buscar agendamentos do paciente
-      const { data: appointmentsData } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          appointment_date,
-          appointment_time,
-          status,
-          psychologist_id
-        `)
-        .eq('patient_id', patientData.id)
-        .order('appointment_date', { ascending: true })
-        .order('appointment_time', { ascending: true })
-
-      if (appointmentsData) {
-        // Buscar dados dos psicólogos
-        const enrichedAppointments = await Promise.all(
-          appointmentsData.map(async (apt) => {
-            const { data: psychData } = await supabase
-              .from('psychologists')
-              .select('user_id, specialties')
-              .eq('id', apt.psychologist_id)
-              .single()
-
-            if (psychData) {
-              const { data: psychProfile } = await supabase
-                .from('profiles')
-                .select('full_name, avatar_url')
-                .eq('user_id', psychData.user_id)
-                .single()
-
-              return {
-                ...apt,
-                psychologist: {
-                  full_name: psychProfile?.full_name || 'Psicólogo',
-                  avatar_url: psychProfile?.avatar_url,
-                  specialties: psychData.specialties || []
-                }
-              }
-            }
-            return apt
-          })
-        )
-
-        setAppointments(enrichedAppointments)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados do paciente:', error)
-    }
-  }
-
   const loadPsychologistData = async (userId: string) => {
     try {
-      // Buscar ID e stats do psicólogo
       const { data: psychData } = await supabase
         .from('psychologists')
-        .select('id, rating, total_reviews')
+        .select('*')
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
 
       if (!psychData) return
 
-      // Buscar agendamentos do psicólogo
+      setPsychologistData(psychData)
+      checkProfileCompletion(psychData)
+
       const { data: appointmentsData } = await supabase
         .from('appointments')
         .select(`
@@ -172,21 +138,20 @@ export default function DashboardPage() {
         .order('appointment_time', { ascending: true })
 
       if (appointmentsData) {
-        // Buscar dados dos pacientes
         const enrichedAppointments = await Promise.all(
           appointmentsData.map(async (apt) => {
             const { data: patientData } = await supabase
               .from('patients')
               .select('user_id')
               .eq('id', apt.patient_id)
-              .single()
+              .maybeSingle()
 
             if (patientData) {
               const { data: patientProfile } = await supabase
                 .from('profiles')
                 .select('full_name, avatar_url')
                 .eq('user_id', patientData.user_id)
-                .single()
+                .maybeSingle()
 
               return {
                 ...apt,
@@ -201,23 +166,69 @@ export default function DashboardPage() {
         )
 
         setAppointments(enrichedAppointments)
-
-        // Calcular stats
-        const today = new Date().toISOString().split('T')[0]
-        const upcoming = enrichedAppointments.filter(
-          apt => apt.appointment_date >= today && apt.status !== 'cancelled'
-        ).length
-
-        setStats({
-          total_sessions: enrichedAppointments.filter(apt => apt.status === 'completed').length,
-          upcoming_sessions: upcoming,
-          rating: psychData.rating || 0,
-          total_reviews: psychData.total_reviews || 0
-        })
       }
     } catch (error) {
       console.error('Erro ao carregar dados do psicólogo:', error)
     }
+  }
+
+  const checkProfileCompletion = (data: PsychologistData) => {
+    // PARTE 1 - Verificações
+    const parte1Checks = [
+      { complete: data.specialties && data.specialties.length > 0, label: 'Áreas de especialização' },
+      { complete: data.approaches && data.approaches.length > 0, label: 'Abordagens terapêuticas' },
+      { complete: data.education_list && data.education_list.length > 0, label: 'Formações e cursos' },
+      { complete: !!data.short_bio && data.short_bio.trim() !== '', label: 'Biografia resumida' },
+      { complete: !!data.full_bio && data.full_bio.trim() !== '', label: 'Biografia completa' },
+      { complete: data.price_per_session > 0, label: 'Valor da sessão' },
+      { complete: !!data.race && data.race.trim() !== '', label: 'Cor/Raça' },
+      { complete: !!data.sexual_orientation && data.sexual_orientation.trim() !== '', label: 'Orientação sexual' },
+      { complete: !!data.pronouns && data.pronouns.trim() !== '', label: 'Pronomes' }
+    ]
+
+    // PARTE 2 - Verificações
+    const parte2Checks = [
+      { complete: data.age_groups && data.age_groups.length > 0, label: 'Faixas etárias atendidas' },
+      { complete: data.modality && data.modality.length > 0, label: 'Modalidade de atendimento' },
+      { complete: data.languages && data.languages.length > 0, label: 'Idiomas de atendimento' },
+      { complete: !!data.pix_key && data.pix_key.trim() !== '', label: 'Chave PIX' }
+    ]
+
+    // PARTE 3 - Verificações
+    const parte3Checks = [
+      { complete: !!data.avatar_url && data.avatar_url.trim() !== '', label: 'Foto de perfil' },
+      { complete: !!data.crp_document_url && data.crp_document_url.trim() !== '', label: 'Comprovante do CRP' },
+      { complete: !!data.plan_type && data.plan_type.trim() !== '', label: 'Plano escolhido' }
+    ]
+
+    const allChecks = [...parte1Checks, ...parte2Checks, ...parte3Checks]
+    
+    const parte1Completed = parte1Checks.filter(c => c.complete).length
+    const parte1Total = parte1Checks.length
+    const parte1Complete = parte1Completed === parte1Total
+
+    const parte2Completed = parte2Checks.filter(c => c.complete).length
+    const parte2Total = parte2Checks.length
+    const parte2Complete = parte2Completed === parte2Total
+
+    const parte3Completed = parte3Checks.filter(c => c.complete).length
+    const parte3Total = parte3Checks.length
+    const parte3Complete = parte3Completed === parte3Total
+
+    const totalCompleted = allChecks.filter(c => c.complete).length
+    const totalChecks = allChecks.length
+    const percentage = Math.round((totalCompleted / totalChecks) * 100)
+    
+    const missing = allChecks.filter(c => !c.complete).map(c => c.label)
+
+    setProfileCompletion({
+      isComplete: percentage === 100,
+      percentage,
+      missing,
+      parte1Complete,
+      parte2Complete,
+      parte3Complete
+    })
   }
 
   const getStatusBadge = (status: string) => {
@@ -228,6 +239,15 @@ export default function DashboardPage() {
       cancelled: { text: 'Cancelada', class: 'status-cancelled' }
     }
     return badges[status as keyof typeof badges] || { text: status, class: '' }
+  }
+
+  const getApprovalStatusBadge = (status: string) => {
+    const badges = {
+      pending: { text: 'Aguardando aprovação', class: 'approval-pending', icon: '⏳' },
+      approved: { text: 'Aprovado', class: 'approval-approved', icon: '✅' },
+      rejected: { text: 'Rejeitado', class: 'approval-rejected', icon: '❌' }
+    }
+    return badges[status as keyof typeof badges] || badges.pending
   }
 
   const formatDate = (date: string) => {
@@ -260,6 +280,21 @@ export default function DashboardPage() {
     )
   }
 
+  // Função para determinar próximo passo
+  const getNextStepUrl = () => {
+    if (!profileCompletion.parte1Complete) return '/completar-perfil/parte-1'
+    if (!profileCompletion.parte2Complete) return '/completar-perfil/parte-2'
+    if (!profileCompletion.parte3Complete) return '/completar-perfil/parte-3'
+    return '/dashboard'
+  }
+
+  const getNextStepLabel = () => {
+    if (!profileCompletion.parte1Complete) return 'Começar Parte 1'
+    if (!profileCompletion.parte2Complete) return 'Continuar para Parte 2'
+    if (!profileCompletion.parte3Complete) return 'Continuar para Parte 3'
+    return 'Perfil Completo'
+  }
+
   if (loading) {
     return (
       <>
@@ -278,30 +313,117 @@ export default function DashboardPage() {
 
   const upcomingAppointments = getUpcomingAppointments()
   const pastAppointments = getPastAppointments()
+  const approvalBadge = psychologistData ? getApprovalStatusBadge(psychologistData.approval_status) : null
 
   return (
     <>
       <main className="dashboard-page">
+        <div className="bg-decoration bg-decoration-1"></div>
+        <div className="bg-decoration bg-decoration-2"></div>
+
         <div className="dashboard-container">
           
           {/* Header */}
           <div className="dashboard-header">
-            <div>
-              <h1>Olá, {profile?.full_name?.split(' ')[0] || 'Usuário'}! 👋</h1>
-              <p>
-                {profile?.user_type === 'patient' 
-                  ? 'Gerencie suas sessões e encontre psicólogos'
-                  : 'Acompanhe seus atendimentos e pacientes'
-                }
-              </p>
+            <div className="header-content">
+              <div className="greeting">
+                <h1>Olá, {profile?.full_name?.split(' ')[0] || 'Psicólogo'}! 👋</h1>
+                <p>Bem-vindo ao seu painel de controle</p>
+              </div>
             </div>
             <Link href="/perfil" className="btn-profile">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
               Editar Perfil
             </Link>
           </div>
 
-          {/* Stats Cards (apenas para psicólogo) */}
-          {profile?.user_type === 'psychologist' && stats && (
+          {/* Alerta de Perfil Incompleto */}
+          {!profileCompletion.isComplete && (
+            <div className="alert-card incomplete">
+              <div className="alert-icon">⚠️</div>
+              <div className="alert-content">
+                <h3>Complete seu perfil para ficar visível</h3>
+                <p>Você precisa completar algumas informações para que pacientes possam te encontrar</p>
+                
+                <div className="progress-bar-container">
+                  <div className="progress-bar-bg">
+                    <div className="progress-bar-fill" style={{ width: `${profileCompletion.percentage}%` }}></div>
+                  </div>
+                  <span className="progress-text">{profileCompletion.percentage}% completo</span>
+                </div>
+
+                {/* Indicador de partes */}
+                <div className="parts-status">
+                  <div className={`part-badge ${profileCompletion.parte1Complete ? 'complete' : 'incomplete'}`}>
+                    {profileCompletion.parte1Complete ? '✓' : '○'} Parte 1 - Perfil Profissional
+                  </div>
+                  <div className={`part-badge ${profileCompletion.parte2Complete ? 'complete' : 'incomplete'}`}>
+                    {profileCompletion.parte2Complete ? '✓' : '○'} Parte 2 - Logística e Pagamento
+                  </div>
+                  <div className={`part-badge ${profileCompletion.parte3Complete ? 'complete' : 'incomplete'}`}>
+                    {profileCompletion.parte3Complete ? '✓' : '○'} Parte 3 - Documentos e Plano
+                  </div>
+                </div>
+
+                <div className="missing-items">
+                  <strong>Faltam:</strong>
+                  <ul>
+                    {profileCompletion.missing.map((item, idx) => (
+                      <li key={idx}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Botão inteligente - vai para a próxima parte incompleta */}
+              <Link 
+                href={getNextStepUrl()} 
+                className="btn-complete"
+              >
+                {getNextStepLabel()}
+                <span>→</span>
+              </Link>
+            </div>
+          )}
+
+          {/* Status de Aprovação */}
+          {profileCompletion.isComplete && psychologistData && (
+            <div className={`alert-card ${psychologistData.approval_status === 'approved' ? 'approved' : 'pending'}`}>
+              <div className="alert-icon">{approvalBadge?.icon}</div>
+              <div className="alert-content">
+                {psychologistData.approval_status === 'pending' && (
+                  <>
+                    <h3>Aguardando aprovação</h3>
+                    <p>Seu perfil está completo e em análise. Em breve você estará visível para os pacientes!</p>
+                    <div className="plan-info">
+                      <strong>Plano escolhido:</strong> {psychologistData.plan_type === 'premium' ? 'Premium 💎' : 'Essencial'}
+                    </div>
+                  </>
+                )}
+                {psychologistData.approval_status === 'approved' && psychologistData.is_active && (
+                  <>
+                    <h3>Perfil ativo! 🎉</h3>
+                    <p>Seu perfil está aprovado e visível para pacientes. Aguarde os agendamentos chegarem!</p>
+                    <div className="plan-info">
+                      <strong>Plano ativo:</strong> {psychologistData.plan_type === 'premium' ? 'Premium 💎' : 'Essencial'}
+                    </div>
+                  </>
+                )}
+                {psychologistData.approval_status === 'approved' && !psychologistData.is_active && (
+                  <>
+                    <h3>Perfil aprovado mas inativo</h3>
+                    <p>Entre em contato com o suporte para ativar seu perfil</p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Stats Cards */}
+          {psychologistData && (
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-icon sessions">
@@ -313,7 +435,7 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div className="stat-content">
-                  <h3>{stats.total_sessions}</h3>
+                  <h3>{appointments.filter(apt => apt.status === 'completed').length}</h3>
                   <p>Sessões realizadas</p>
                 </div>
               </div>
@@ -326,7 +448,7 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div className="stat-content">
-                  <h3>{stats.upcoming_sessions}</h3>
+                  <h3>{upcomingAppointments.length}</h3>
                   <p>Sessões agendadas</p>
                 </div>
               </div>
@@ -338,35 +460,20 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div className="stat-content">
-                  <h3>{stats.rating.toFixed(1)}</h3>
-                  <p>{stats.total_reviews} avaliações</p>
+                  <h3>{psychologistData.rating.toFixed(1)}</h3>
+                  <p>{psychologistData.total_reviews} avaliações</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Quick Actions (apenas para paciente) */}
-          {profile?.user_type === 'patient' && (
-            <div className="quick-actions">
-              <Link href="/psicologos" className="action-card primary">
-                <div className="action-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                  </svg>
-                </div>
-                <div>
-                  <h3>Buscar Psicólogos</h3>
-                  <p>Encontre o profissional ideal</p>
-                </div>
-              </Link>
-            </div>
-          )}
-
           {/* Upcoming Appointments */}
-          <div className="section">
+          <div className="section-card">
             <div className="section-header">
-              <h2>Próximas Sessões</h2>
+              <div>
+                <h2>Próximas Sessões</h2>
+                <p>Seus atendimentos agendados</p>
+              </div>
               {upcomingAppointments.length > 0 && (
                 <span className="count-badge">{upcomingAppointments.length}</span>
               )}
@@ -374,63 +481,30 @@ export default function DashboardPage() {
 
             {upcomingAppointments.length === 0 ? (
               <div className="empty-state">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
+                <div className="empty-icon">📅</div>
                 <h3>Nenhuma sessão agendada</h3>
                 <p>
-                  {profile?.user_type === 'patient'
-                    ? 'Busque um psicólogo e agende sua primeira sessão'
-                    : 'Aguardando novos agendamentos de pacientes'
-                  }
+                  {profileCompletion.isComplete 
+                    ? 'Aguardando novos agendamentos de pacientes' 
+                    : 'Complete seu perfil para começar a receber agendamentos'}
                 </p>
-                {profile?.user_type === 'patient' && (
-                  <Link href="/psicologos" className="btn-empty">
-                    Buscar Psicólogos
-                  </Link>
-                )}
               </div>
             ) : (
               <div className="appointments-list">
                 {upcomingAppointments.map(apt => (
                   <div key={apt.id} className="appointment-card">
                     <div className="appointment-avatar">
-                      {profile?.user_type === 'patient' ? (
-                        apt.psychologist?.avatar_url ? (
-                          <img src={apt.psychologist.avatar_url} alt="Avatar" />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            {getInitials(apt.psychologist?.full_name || 'P')}
-                          </div>
-                        )
+                      {apt.patient?.avatar_url ? (
+                        <img src={apt.patient.avatar_url} alt="Avatar" />
                       ) : (
-                        apt.patient?.avatar_url ? (
-                          <img src={apt.patient.avatar_url} alt="Avatar" />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            {getInitials(apt.patient?.full_name || 'P')}
-                          </div>
-                        )
+                        <div className="avatar-placeholder">
+                          {getInitials(apt.patient?.full_name || 'P')}
+                        </div>
                       )}
                     </div>
 
                     <div className="appointment-info">
-                      <h3>
-                        {profile?.user_type === 'patient' 
-                          ? apt.psychologist?.full_name 
-                          : apt.patient?.full_name
-                        }
-                      </h3>
-                      {profile?.user_type === 'patient' && apt.psychologist?.specialties && (
-                        <div className="specialties">
-                          {apt.psychologist.specialties.slice(0, 2).map((spec, idx) => (
-                            <span key={idx} className="specialty-tag">{spec}</span>
-                          ))}
-                        </div>
-                      )}
+                      <h3>{apt.patient?.full_name}</h3>
                       <div className="appointment-datetime">
                         <span>📅 {formatDate(apt.appointment_date)}</span>
                         <span>🕐 {formatTime(apt.appointment_time)}</span>
@@ -450,9 +524,12 @@ export default function DashboardPage() {
 
           {/* Past Appointments */}
           {pastAppointments.length > 0 && (
-            <div className="section">
+            <div className="section-card">
               <div className="section-header">
-                <h2>Histórico</h2>
+                <div>
+                  <h2>Histórico de Sessões</h2>
+                  <p>Atendimentos anteriores</p>
+                </div>
                 <span className="count-badge">{pastAppointments.length}</span>
               </div>
 
@@ -460,32 +537,17 @@ export default function DashboardPage() {
                 {pastAppointments.slice(0, 5).map(apt => (
                   <div key={apt.id} className="appointment-card past">
                     <div className="appointment-avatar">
-                      {profile?.user_type === 'patient' ? (
-                        apt.psychologist?.avatar_url ? (
-                          <img src={apt.psychologist.avatar_url} alt="Avatar" />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            {getInitials(apt.psychologist?.full_name || 'P')}
-                          </div>
-                        )
+                      {apt.patient?.avatar_url ? (
+                        <img src={apt.patient.avatar_url} alt="Avatar" />
                       ) : (
-                        apt.patient?.avatar_url ? (
-                          <img src={apt.patient.avatar_url} alt="Avatar" />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            {getInitials(apt.patient?.full_name || 'P')}
-                          </div>
-                        )
+                        <div className="avatar-placeholder">
+                          {getInitials(apt.patient?.full_name || 'P')}
+                        </div>
                       )}
                     </div>
 
                     <div className="appointment-info">
-                      <h3>
-                        {profile?.user_type === 'patient' 
-                          ? apt.psychologist?.full_name 
-                          : apt.patient?.full_name
-                        }
-                      </h3>
+                      <h3>{apt.patient?.full_name}</h3>
                       <div className="appointment-datetime">
                         <span>📅 {formatDate(apt.appointment_date)}</span>
                         <span>🕐 {formatTime(apt.appointment_time)}</span>
@@ -503,7 +565,7 @@ export default function DashboardPage() {
 
               {pastAppointments.length > 5 && (
                 <button className="btn-see-more">
-                  Ver todas as {pastAppointments.length} sessões
+                  Ver todas as {pastAppointments.length} sessões anteriores
                 </button>
               )}
             </div>
@@ -519,13 +581,46 @@ export default function DashboardPage() {
 const styles = `
   .dashboard-page {
     min-height: 100vh;
-    background: #faf9fc;
+    background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
     padding: 120px 24px 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bg-decoration {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124, 101, 181, 0.08) 0%, transparent 70%);
+    animation: float 20s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .bg-decoration-1 {
+    width: 600px;
+    height: 600px;
+    top: -200px;
+    right: -100px;
+  }
+
+  .bg-decoration-2 {
+    width: 400px;
+    height: 400px;
+    bottom: -150px;
+    left: -50px;
+    animation-delay: -7s;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -30px) scale(1.05); }
+    66% { transform: translate(-20px, 20px) scale(0.95); }
   }
 
   .dashboard-container {
     max-width: 1200px;
     margin: 0 auto;
+    position: relative;
+    z-index: 1;
   }
 
   /* Header */
@@ -533,45 +628,251 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
     flex-wrap: wrap;
     gap: 20px;
   }
 
-  .dashboard-header h1 {
-    font-size: 32px;
-    font-weight: 800;
-    color: #2d1f3e;
-    margin-bottom: 4px;
+  .header-content {
+    animation: slideInLeft 0.6s ease;
   }
 
-  .dashboard-header p {
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .greeting h1 {
+    font-size: 36px;
+    font-weight: 900;
+    color: #2d1f3e;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+
+  .greeting p {
     color: #6b5d7a;
     font-size: 16px;
   }
 
   .btn-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 12px 24px;
-    border-radius: 10px;
-    border: 2px solid #7c65b5;
+    border-radius: 12px;
+    border: 2px solid rgba(124, 101, 181, 0.2);
     background: white;
     color: #7c65b5;
     font-weight: 600;
     text-decoration: none;
     transition: all 0.3s ease;
+    animation: slideInRight 0.6s ease;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   .btn-profile:hover {
-    background: #7c65b5;
-    color: white;
+    border-color: #7c65b5;
+    background: rgba(124, 101, 181, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.15);
   }
 
-  /* Stats Grid (Psicólogo) */
+  /* Alert Card */
+  .alert-card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    border: 2px solid;
+    animation: slideDown 0.6s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .alert-card.incomplete {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  }
+
+  .alert-card.pending {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  }
+
+  .alert-card.approved {
+    border-color: #22c55e;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  }
+
+  .alert-icon {
+    font-size: 48px;
+    flex-shrink: 0;
+  }
+
+  .alert-content {
+    flex: 1;
+  }
+
+  .alert-content h3 {
+    font-size: 20px;
+    font-weight: 800;
+    color: #2d1f3e;
+    margin-bottom: 8px;
+  }
+
+  .alert-content p {
+    color: #6b5d7a;
+    font-size: 15px;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  .progress-bar-container {
+    margin-bottom: 16px;
+  }
+
+  .progress-bar-bg {
+    height: 12px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    border-radius: 20px;
+    transition: width 0.5s ease;
+  }
+
+  .progress-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7c65b5;
+  }
+
+  .parts-status {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .part-badge {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .part-badge.complete {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+  }
+
+  .part-badge.incomplete {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .missing-items {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 16px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+
+  .missing-items strong {
+    color: #2d1f3e;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .missing-items ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    color: #6b5d7a;
+  }
+
+  .missing-items li {
+    margin-bottom: 4px;
+  }
+
+  .plan-info {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-top: 12px;
+  }
+
+  .plan-info strong {
+    color: #2d1f3e;
+  }
+
+  .btn-complete {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    color: white;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.3);
+  }
+
+  .btn-complete:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(124, 101, 181, 0.4);
+  }
+
+  /* Stats Grid */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 20px;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
   }
 
   .stat-card {
@@ -580,18 +881,43 @@ const styles = `
     padding: 24px;
     display: flex;
     align-items: center;
-    gap: 16px;
-    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.08);
+    gap: 20px;
+    box-shadow: 0 4px 20px rgba(124, 101, 181, 0.08);
+    border: 1px solid rgba(124, 101, 181, 0.08);
+    transition: all 0.3s ease;
+    opacity: 0;
+    animation: fadeInUp 0.6s ease forwards;
+  }
+
+  .stat-card:nth-child(1) { animation-delay: 0.1s; }
+  .stat-card:nth-child(2) { animation-delay: 0.2s; }
+  .stat-card:nth-child(3) { animation-delay: 0.3s; }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 28px rgba(124, 101, 181, 0.15);
   }
 
   .stat-icon {
     width: 56px;
     height: 56px;
-    border-radius: 12px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
+    flex-shrink: 0;
   }
 
   .stat-icon.sessions {
@@ -607,8 +933,8 @@ const styles = `
   }
 
   .stat-content h3 {
-    font-size: 28px;
-    font-weight: 800;
+    font-size: 32px;
+    font-weight: 900;
     color: #2d1f3e;
     margin-bottom: 4px;
   }
@@ -616,87 +942,51 @@ const styles = `
   .stat-content p {
     font-size: 14px;
     color: #6b5d7a;
+    font-weight: 500;
   }
 
-  /* Quick Actions (Paciente) */
-  .quick-actions {
-    margin-bottom: 40px;
-  }
-
-  .action-card {
+  /* Section Card */
+  .section-card {
     background: white;
-    border-radius: 16px;
-    padding: 24px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.08);
-    text-decoration: none;
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-  }
-
-  .action-card.primary {
-    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
-  }
-
-  .action-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(124, 101, 181, 0.15);
-  }
-
-  .action-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-  }
-
-  .action-card h3 {
-    font-size: 20px;
-    font-weight: 700;
-    color: white;
-    margin-bottom: 4px;
-  }
-
-  .action-card p {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.9);
-  }
-
-  /* Section */
-  .section {
-    background: white;
-    border-radius: 16px;
+    border-radius: 20px;
     padding: 32px;
     margin-bottom: 24px;
-    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.08);
+    box-shadow: 0 4px 20px rgba(124, 101, 181, 0.08);
+    border: 1px solid rgba(124, 101, 181, 0.08);
+    animation: fadeInUp 0.6s ease;
+    animation-delay: 0.4s;
+    animation-fill-mode: both;
   }
 
   .section-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
     margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .section-header h2 {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 800;
     color: #2d1f3e;
+    margin-bottom: 4px;
+  }
+
+  .section-header p {
+    font-size: 14px;
+    color: #6b5d7a;
   }
 
   .count-badge {
-    background: rgba(124, 101, 181, 0.1);
-    color: #7c65b5;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    color: white;
     font-size: 14px;
     font-weight: 700;
-    padding: 4px 12px;
+    padding: 6px 16px;
     border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(124, 101, 181, 0.25);
   }
 
   /* Empty State */
@@ -705,13 +995,15 @@ const styles = `
     padding: 60px 20px;
   }
 
-  .empty-state svg {
-    color: #9b8fab;
+  .empty-icon {
+    font-size: 64px;
     margin-bottom: 20px;
+    opacity: 0.7;
   }
 
   .empty-state h3 {
     font-size: 20px;
+    font-weight: 700;
     color: #2d1f3e;
     margin-bottom: 8px;
   }
@@ -719,23 +1011,6 @@ const styles = `
   .empty-state p {
     color: #6b5d7a;
     font-size: 15px;
-    margin-bottom: 24px;
-  }
-
-  .btn-empty {
-    display: inline-block;
-    padding: 12px 28px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
-    color: white;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.3s ease;
-  }
-
-  .btn-empty:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.3);
   }
 
   /* Appointments List */
@@ -748,16 +1023,18 @@ const styles = `
   .appointment-card {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
     padding: 20px;
-    border-radius: 12px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(244, 242, 250, 0.5) 0%, rgba(232, 228, 247, 0.5) 100%);
     border: 2px solid rgba(124, 101, 181, 0.1);
     transition: all 0.3s ease;
   }
 
   .appointment-card:hover {
     border-color: #7c65b5;
-    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.1);
+    box-shadow: 0 4px 20px rgba(124, 101, 181, 0.15);
+    transform: translateX(4px);
   }
 
   .appointment-card.past {
@@ -783,7 +1060,7 @@ const styles = `
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 18px;
+    font-size: 20px;
   }
 
   .appointment-info {
@@ -797,26 +1074,12 @@ const styles = `
     margin-bottom: 8px;
   }
 
-  .specialties {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-
-  .specialty-tag {
-    padding: 4px 10px;
-    border-radius: 6px;
-    background: rgba(124, 101, 181, 0.1);
-    color: #7c65b5;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
   .appointment-datetime {
     display: flex;
-    gap: 16px;
+    gap: 20px;
     font-size: 14px;
     color: #6b5d7a;
+    font-weight: 500;
   }
 
   .appointment-actions {
@@ -824,10 +1087,11 @@ const styles = `
   }
 
   .status-badge {
-    padding: 6px 16px;
+    padding: 8px 16px;
     border-radius: 20px;
     font-size: 13px;
     font-weight: 600;
+    white-space: nowrap;
   }
 
   .status-badge.status-scheduled {
@@ -852,13 +1116,14 @@ const styles = `
 
   .btn-see-more {
     width: 100%;
-    padding: 12px;
+    padding: 14px;
     margin-top: 16px;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 2px solid rgba(124, 101, 181, 0.2);
     background: white;
     color: #7c65b5;
     font-weight: 600;
+    font-size: 15px;
     cursor: pointer;
     transition: all 0.3s ease;
   }
@@ -904,31 +1169,49 @@ const styles = `
       align-items: flex-start;
     }
 
-    .dashboard-header h1 {
-      font-size: 26px;
+    .greeting h1 {
+      font-size: 28px;
+    }
+
+    .alert-card {
+      flex-direction: column;
+      padding: 24px;
+    }
+
+    .btn-complete {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .parts-status {
+      flex-direction: column;
+    }
+
+    .part-badge {
+      width: 100%;
     }
 
     .stats-grid {
       grid-template-columns: 1fr;
     }
 
-    .section {
+    .section-card {
       padding: 24px 20px;
     }
 
     .appointment-card {
       flex-direction: column;
       align-items: flex-start;
-      text-align: left;
+      gap: 16px;
     }
 
     .appointment-actions {
       width: 100%;
     }
 
-    .status-badge {
-      display: block;
-      text-align: center;
+    .appointment-datetime {
+      flex-direction: column;
+      gap: 8px;
     }
   }
 `
