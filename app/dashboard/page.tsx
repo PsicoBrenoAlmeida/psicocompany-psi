@@ -16,12 +16,11 @@ interface PsychologistData {
   id: string
   crp: string
   specialties: string[]
-  approach: string
-  approaches: string[]
+  approaches: string[]  // ✅ PLURAL
   price_per_session: number
   short_bio: string
   full_bio: string
-  education_list: string[]
+  education_list: { title: string; year: string }[]  // ✅ TIPO CORRETO
   race: string
   sexual_orientation: string
   pronouns: string
@@ -29,6 +28,7 @@ interface PsychologistData {
   modality: string[]
   languages: string[]
   pix_key: string
+  pix_key_type: string
   avatar_url?: string
   crp_document_url?: string
   plan_type: string
@@ -36,6 +36,13 @@ interface PsychologistData {
   is_active: boolean
   rating: number
   total_reviews: number
+  session_duration: number
+  city?: string
+  state_location?: string
+  bank_name?: string
+  bank_account_type?: string
+  bank_agency?: string
+  bank_account?: string
 }
 
 interface Appointment {

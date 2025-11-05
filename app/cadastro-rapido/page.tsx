@@ -135,7 +135,7 @@ export default function CadastroRapidoPage() {
           user_id: authData.user.id,
           crp: crp,
           specialties: [],
-          approach: '',
+          approaches: [],
           price_per_session: 0,
           short_bio: '',
           approval_status: 'pending',
