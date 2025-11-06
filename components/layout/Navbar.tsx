@@ -1,11 +1,11 @@
-// components/layout/Navbar.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabaseClient'
 import { User } from '@supabase/supabase-js'
+import Image from 'next/image' // Importa o componente Image do Next.js
 
 interface ProfileData {
   full_name?: string
@@ -13,21 +13,7 @@ interface ProfileData {
   user_type?: 'patient' | 'psychologist'
 }
 
-interface PsychologistData {
-  specialties: string[]
-  approaches: string[]
-  education_list: any[]
-  short_bio: string
-  full_bio: string
-  price_per_session: number
-  age_groups: string[]
-  modality: string[]
-  languages: string[]
-  pix_key: string
-  avatar_url?: string
-  crp_document_url?: string
-  plan_type: string
-}
+// A interface PsychologistData foi removida por não ser usada, conforme o warning.
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
@@ -42,63 +28,8 @@ export default function Navbar() {
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
-        
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url, user_type')
-            .eq('user_id', user.id)
-            .single()
-          
-          setProfileData(profile)
-          
-          // Se for psicólogo, verificar se o perfil está completo
-          if (profile?.user_type === 'psychologist') {
-            setIsPsychologist(true)
-            await checkProfileCompletion(user.id)
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao verificar usuário:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    checkUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, avatar_url, user_type')
-          .eq('user_id', session.user.id)
-          .single()
-        
-        setProfileData(profile)
-        
-        if (profile?.user_type === 'psychologist') {
-          setIsPsychologist(true)
-          await checkProfileCompletion(session.user.id)
-        }
-      } else {
-        setProfileData(null)
-        setIsPsychologist(false)
-        setProfileComplete(true)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [supabase])
-
-  const checkProfileCompletion = async (userId: string) => {
+  // 1. Corrigido: checkProfileCompletion agora é useCallback para ser estável nas dependências
+  const checkProfileCompletion = useCallback(async (userId: string) => {
     try {
       const { data: psychData } = await supabase
         .from('psychologists')
@@ -139,7 +70,70 @@ export default function Navbar() {
       console.error('Erro ao verificar perfil:', error)
       setProfileComplete(false)
     }
-  }
+  }, [supabase]) // Depende apenas de supabase, que é estável/criado fora do render
+
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+        
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url, user_type')
+            .eq('user_id', user.id)
+            .single()
+          
+          setProfileData(profile)
+          
+          // Se for psicólogo, verificar se o perfil está completo
+          if (profile?.user_type === 'psychologist') {
+            setIsPsychologist(true)
+            // Corrigido: checkProfileCompletion agora está nas dependências
+            checkProfileCompletion(user.id) 
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar usuário:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user ?? null)
+      
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url, user_type')
+          .eq('user_id', session.user.id)
+          .single()
+        
+        setProfileData(profile)
+        
+        if (profile?.user_type === 'psychologist') {
+          setIsPsychologist(true)
+          // Corrigido: checkProfileCompletion agora está nas dependências
+          checkProfileCompletion(session.user.id)
+        }
+      } else {
+        setProfileData(null)
+        setIsPsychologist(false)
+        setProfileComplete(true)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  // Removi `checkProfileCompletion` daqui, pois ela só deve ser chamada APÓS o primeiro fetch de usuário/perfil estar pronto (que já a chama) ou se o supabase mudar.
+  // A chamada dela dentro do onAuthStateChange também não precisa dela como dependência, pois ela é estável via useCallback.
+  }, [supabase, checkProfileCompletion]) 
+
+  // Dependências corrigidas: checkProfileCompletion agora é estável via useCallback
+  // O segundo useEffect de scroll não precisava de correções de dependências, mas o primeiro sim.
 
   useEffect(() => {
     const handleScroll = () => {
@@ -237,10 +231,13 @@ export default function Navbar() {
                       aria-label="Menu do perfil"
                     >
                       {profileData?.avatar_url ? (
-                        <img 
+                        <Image // Corrigido: <img> para <Image>
                           src={profileData.avatar_url} 
                           alt="Avatar" 
                           className="avatar"
+                          width={42} // Adicionado tamanho para otimização
+                          height={42} // Adicionado tamanho para otimização
+                          priority // Adicionado para garantir carregamento rápido
                         />
                       ) : (
                         <div className="avatar-placeholder">
@@ -265,9 +262,13 @@ export default function Navbar() {
                         <div className="dropdown-header">
                           <div className="dropdown-avatar">
                             {profileData?.avatar_url ? (
-                              <img 
+                              <Image // Corrigido: <img> para <Image>
                                 src={profileData.avatar_url} 
                                 alt="Avatar" 
+                                className="dropdown-avatar-img" // Nova classe para estilo específico do dropdown
+                                width={52} // Adicionado tamanho
+                                height={52} // Adicionado tamanho
+                                priority
                               />
                             ) : (
                               <div className="dropdown-avatar-placeholder">
@@ -888,6 +889,7 @@ export default function Navbar() {
             font-size: 20px;
           }
         }
+
       `}</style>
     </>
   )
