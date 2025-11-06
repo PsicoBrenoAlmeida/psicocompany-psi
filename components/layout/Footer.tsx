@@ -86,25 +86,28 @@ export default function Footer() {
         .footer-container {
           max-width: 1200px;
           margin: 0 auto;
-          padding: 40px 24px;
+          padding: 48px 24px;
         }
 
         .footer-content {
           display: flex;
+          flex-direction: column;
           align-items: center;
-          justify-content: space-between;
-          gap: 40px;
-          flex-wrap: wrap;
+          justify-content: center;
+          gap: 32px;
+          text-align: center;
         }
 
         /* Brand */
         .footer-brand {
-          flex: 1;
-          min-width: 200px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
         }
 
         .footer-logo {
-          font-size: 24px;
+          font-size: 28px;
           font-weight: 900;
           background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
           -webkit-background-clip: text;
@@ -112,7 +115,6 @@ export default function Footer() {
           background-clip: text;
           text-decoration: none;
           display: inline-block;
-          margin-bottom: 8px;
           transition: transform 0.3s ease;
         }
 
@@ -122,22 +124,24 @@ export default function Footer() {
 
         .footer-description {
           color: #6b5d7a;
-          font-size: 14px;
+          font-size: 15px;
           margin: 0;
+          font-weight: 500;
         }
 
         /* Social */
         .footer-social {
           display: flex;
-          gap: 12px;
-          flex-shrink: 0;
+          gap: 16px;
+          justify-content: center;
+          align-items: center;
         }
 
         .social-link {
-          width: 40px;
-          height: 40px;
+          width: 44px;
+          height: 44px;
           background: white;
-          border: 2px solid rgba(124, 101, 181, 0.1);
+          border: 2px solid rgba(124, 101, 181, 0.15);
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -150,63 +154,73 @@ export default function Footer() {
           background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
           color: white;
           border-color: transparent;
-          transform: translateY(-3px);
-          box-shadow: 0 4px 12px rgba(124, 101, 181, 0.3);
+          transform: translateY(-4px);
+          box-shadow: 0 6px 16px rgba(124, 101, 181, 0.3);
         }
 
         .social-link svg {
-          width: 18px;
-          height: 18px;
+          width: 20px;
+          height: 20px;
         }
 
         /* Info */
         .footer-info {
-          text-align: right;
-          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
         }
 
         .copyright {
           color: #6b5d7a;
-          font-size: 13px;
-          margin: 0 0 4px 0;
+          font-size: 14px;
+          margin: 0;
           font-weight: 500;
         }
 
         .cnpj {
           color: #9b8fab;
-          font-size: 12px;
+          font-size: 13px;
           margin: 0;
+          font-weight: 400;
         }
 
         /* Responsivo */
         @media (max-width: 768px) {
           .footer-container {
-            padding: 32px 20px;
+            padding: 40px 20px;
           }
 
           .footer-content {
-            flex-direction: column;
-            text-align: center;
-            gap: 24px;
+            gap: 28px;
           }
 
-          .footer-brand {
-            width: 100%;
+          .footer-logo {
+            font-size: 24px;
           }
 
-          .footer-social {
-            justify-content: center;
+          .footer-description {
+            font-size: 14px;
           }
 
-          .footer-info {
-            text-align: center;
-            width: 100%;
+          .social-link {
+            width: 40px;
+            height: 40px;
+          }
+
+          .social-link svg {
+            width: 18px;
+            height: 18px;
           }
         }
 
         @media (max-width: 480px) {
+          .footer-container {
+            padding: 32px 16px;
+          }
+
           .footer-logo {
-            font-size: 20px;
+            font-size: 22px;
           }
 
           .footer-description {
@@ -214,21 +228,21 @@ export default function Footer() {
           }
 
           .social-link {
-            width: 36px;
-            height: 36px;
+            width: 38px;
+            height: 38px;
           }
 
           .social-link svg {
-            width: 16px;
-            height: 16px;
+            width: 17px;
+            height: 17px;
           }
 
           .copyright {
-            font-size: 12px;
+            font-size: 13px;
           }
 
           .cnpj {
-            font-size: 11px;
+            font-size: 12px;
           }
         }
       `}</style>

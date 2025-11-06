@@ -25,6 +25,10 @@ interface Psychologist {
   city?: string
   state_location?: string
   education_list: { title: string; year: string }[]
+  gender?: string
+  race?: string
+  sexual_orientation?: string
+  pronouns?: string
   profile: {
     full_name: string
     avatar_url?: string
@@ -65,6 +69,19 @@ export default function MeuPerfilPage() {
       }
 
       setUser(user)
+
+      // Verificar se é psicólogo
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!profileData || profileData.user_type !== 'psychologist') {
+        router.push('/dashboard')
+        return
+      }
+
       await loadMyProfile(user.id)
     } catch (error) {
       console.error('Erro ao verificar usuário:', error)
@@ -196,6 +213,16 @@ export default function MeuPerfilPage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   }
 
+  // Verificar se tem pelo menos um campo de afinidade preenchido
+  const hasAffinityInfo = () => {
+    return (
+      (psychologist?.gender && psychologist.gender !== 'Prefiro não informar') ||
+      (psychologist?.race && psychologist.race !== 'Prefiro não informar') ||
+      (psychologist?.sexual_orientation && psychologist.sexual_orientation !== 'Prefiro não informar') ||
+      (psychologist?.pronouns && psychologist.pronouns !== 'Prefiro não informar')
+    )
+  }
+
   if (loading) {
     return (
       <>
@@ -250,7 +277,7 @@ export default function MeuPerfilPage() {
               </svg>
               <span>Você está visualizando seu perfil público</span>
             </div>
-            <Link href="/alterar-cadastro" className="btn-edit-profile">
+            <Link href="/alterar-cadastro/parte-1" className="btn-edit-profile">
               ✏️ Editar Perfil
             </Link>
           </div>
@@ -343,6 +370,42 @@ export default function MeuPerfilPage() {
               </div>
             </div>
           </div>
+
+          {/* Informações de Afinidade */}
+          {hasAffinityInfo() && (
+            <div className="affinity-section">
+              <h3>🤝 Informações de Afinidade</h3>
+              <p className="affinity-subtitle">
+                Essas informações ajudam pacientes a encontrar profissionais com quem se identifiquem
+              </p>
+              <div className="affinity-grid">
+                {psychologist.gender && psychologist.gender !== 'Prefiro não informar' && (
+                  <div className="affinity-item">
+                    <span className="affinity-label">Gênero:</span>
+                    <span className="affinity-value">{psychologist.gender}</span>
+                  </div>
+                )}
+                {psychologist.race && psychologist.race !== 'Prefiro não informar' && (
+                  <div className="affinity-item">
+                    <span className="affinity-label">Cor/Raça:</span>
+                    <span className="affinity-value">{psychologist.race}</span>
+                  </div>
+                )}
+                {psychologist.sexual_orientation && psychologist.sexual_orientation !== 'Prefiro não informar' && (
+                  <div className="affinity-item">
+                    <span className="affinity-label">Orientação Sexual:</span>
+                    <span className="affinity-value">{psychologist.sexual_orientation}</span>
+                  </div>
+                )}
+                {psychologist.pronouns && psychologist.pronouns !== 'Prefiro não informar' && (
+                  <div className="affinity-item">
+                    <span className="affinity-label">Pronomes:</span>
+                    <span className="affinity-value">{psychologist.pronouns}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Especialidades */}
           {psychologist.specialties && psychologist.specialties.length > 0 && (
@@ -680,6 +743,59 @@ const styles = `
     font-size: 24px;
     font-weight: 700;
     color: #7c65b5;
+  }
+
+  /* Affinity Section */
+  .affinity-section {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.08);
+    border: 2px solid rgba(124, 101, 181, 0.1);
+  }
+
+  .affinity-section h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #2d1f3e;
+    margin-bottom: 8px;
+  }
+
+  .affinity-subtitle {
+    color: #6b5d7a;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  .affinity-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .affinity-item {
+    padding: 16px;
+    background: rgba(124, 101, 181, 0.05);
+    border-radius: 10px;
+    border: 1px solid rgba(124, 101, 181, 0.1);
+  }
+
+  .affinity-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #9b8fab;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .affinity-value {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    color: #2d1f3e;
   }
 
   /* Sections */
@@ -1027,10 +1143,15 @@ const styles = `
       font-size: 20px;
     }
 
+    .affinity-grid {
+      grid-template-columns: 1fr;
+    }
+
     .specialties-section,
     .approaches-section,
     .age-groups-section,
     .languages-section,
+    .affinity-section,
     .tabs-content {
       padding: 20px;
     }

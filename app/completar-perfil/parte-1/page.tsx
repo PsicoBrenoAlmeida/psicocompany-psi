@@ -38,10 +38,11 @@ export default function CompletarPerfilParte1() {
   const [sessionDuration, setSessionDuration] = useState('50')
 
   // Step 4 - Afinidade e Inclusão
+  const [crpNumber, setCrpNumber] = useState('')
+  const [gender, setGender] = useState('')
   const [race, setRace] = useState('')
   const [sexualOrientation, setSexualOrientation] = useState('')
   const [pronouns, setPronouns] = useState('')
-  const [crpNumber, setCrpNumber] = useState('') // <-- NOVO STATE PARA O CRP
 
   // Listas de opções
   const specialtiesList = [
@@ -147,10 +148,11 @@ export default function CompletarPerfilParte1() {
         
         if (psychData.approaches) setApproaches(psychData.approaches)
         if (psychData.education_list) setEducationList(psychData.education_list)
+        if (psychData.crp) setCrpNumber(psychData.crp)
+        if (psychData.gender) setGender(psychData.gender)
         if (psychData.race) setRace(psychData.race)
         if (psychData.sexual_orientation) setSexualOrientation(psychData.sexual_orientation)
         if (psychData.pronouns) setPronouns(psychData.pronouns)
-        if (psychData.crp) setCrpNumber(psychData.crp) // <-- CARREGAR O CRP DO BANCO
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -237,18 +239,7 @@ export default function CompletarPerfilParte1() {
   }
 
   const validateStep4 = () => {
-    if (!race) {
-      setMessage({ type: 'error', text: 'Campo Cor/Raça é obrigatório' })
-      return false
-    }
-    if (!sexualOrientation) {
-      setMessage({ type: 'error', text: 'Campo Orientação Sexual é obrigatório' })
-      return false
-    }
-    if (!pronouns) {
-      setMessage({ type: 'error', text: 'Campo Pronomes é obrigatório' })
-      return false
-    }
+    // Dados de afinidade são todos opcionais - apenas avançar
     return true
   }
 
@@ -301,10 +292,10 @@ export default function CompletarPerfilParte1() {
         short_bio: shortBio,
         full_bio: fullBio,
         education_list: educationList,
-        race,
-        sexual_orientation: sexualOrientation,
-        pronouns,
-        crp: crpNumber, // <-- INCLUIR O CRP NO SALVAMENTO
+        gender: gender || null,
+        race: race || null,
+        sexual_orientation: sexualOrientation || null,
+        pronouns: pronouns || null,
       }
 
       console.log('📦 Dados:', updateData)
@@ -360,47 +351,47 @@ export default function CompletarPerfilParte1() {
     } catch (error) {
       console.error('🔴 ERRO COMPLETO:', error)
 
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar'
-let msg = 'Erro ao salvar: '
+      let msg = 'Erro ao salvar: '
 
-if (typeof error === 'object' && error !== null) {
-  const err = error as { message?: string; code?: string }
-  
-  if (err.message?.toLowerCase?.().includes('jwt')) {
-    msg = 'Sua sessão expirou. Faça login novamente.'
-    setTimeout(() => router.push('/login'), 1500)
-  } else if (
-    err.message?.toLowerCase?.().includes('permission') ||
-    err.message?.toLowerCase?.().includes('policy') ||
-    err.code === 'PGRST301'
-  ) {
-    msg = 'Você não tem permissão. Verifique as policies de RLS da tabela psychologists.'
-  } else if (
-    err.code === '23505' ||
-    err.message?.toLowerCase?.().includes('unique') ||
-    err.message?.toLowerCase?.().includes('duplicate')
-  ) {
-    msg = 'Violação de unicidade. Verifique UNIQUE em user_id ou registros duplicados.'
-  } else if (
-    err.code === '23502' ||
-    err.message?.toLowerCase?.().includes('not null')
-  ) {
-    msg = 'Erro de Preenchimento: Um campo obrigatório não foi enviado. Verifique o console.'
-  } else if (
-    err.message?.toLowerCase?.().includes('column') &&
-    err.message?.toLowerCase?.().includes('does not exist')
-  ) {
-    msg = 'Coluna inexistente no payload. Confira nomes e tipos das colunas.'
-  } else if (err.message) {
-    msg += err.message
-  } else {
-    msg += 'Tente novamente.'
-  }
-} else {
-  msg += errorMessage
-}
+      if (typeof error === 'object' && error !== null) {
+        const err = error as { message?: string; code?: string }
+        
+        if (err.message?.toLowerCase?.().includes('jwt')) {
+          msg = 'Sua sessão expirou. Faça login novamente.'
+          setTimeout(() => router.push('/login'), 1500)
+        } else if (
+          err.message?.toLowerCase?.().includes('permission') ||
+          err.message?.toLowerCase?.().includes('policy') ||
+          err.code === 'PGRST301'
+        ) {
+          msg = 'Você não tem permissão. Verifique as policies de RLS da tabela psychologists.'
+        } else if (
+          err.code === '23505' ||
+          err.message?.toLowerCase?.().includes('unique') ||
+          err.message?.toLowerCase?.().includes('duplicate')
+        ) {
+          msg = 'Violação de unicidade. Verifique UNIQUE em user_id ou registros duplicados.'
+        } else if (
+          err.code === '23502' ||
+          err.message?.toLowerCase?.().includes('not null')
+        ) {
+          msg = 'Erro de Preenchimento: Um campo obrigatório não foi enviado. Verifique o console.'
+        } else if (
+          err.message?.toLowerCase?.().includes('column') &&
+          err.message?.toLowerCase?.().includes('does not exist')
+        ) {
+          msg = 'Coluna inexistente no payload. Confira nomes e tipos das colunas.'
+        } else if (err.message) {
+          msg += err.message
+        } else {
+          msg += 'Tente novamente.'
+        }
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+        msg += errorMessage
+      }
 
-setMessage({ type: 'error', text: msg })
+      setMessage({ type: 'error', text: msg })
     } finally {
       setLoading(false)
     }
@@ -438,7 +429,7 @@ setMessage({ type: 'error', text: msg })
                 { num: 1, title: 'Áreas e Abordagens', desc: 'Especialização' },
                 { num: 2, title: 'Formação e Bio', desc: 'Experiência' },
                 { num: 3, title: 'Dados Profissionais', desc: 'Valores e contato' },
-                { num: 4, title: 'Afinidade', desc: 'Inclusão' }
+                { num: 4, title: 'Afinidade', desc: 'Inclusão (opcional)' }
               ].map((step) => (
                 <div 
                   key={step.num}
@@ -654,43 +645,78 @@ setMessage({ type: 'error', text: msg })
                   <div className="step-header">
                     <h2>Dados de Afinidade e Inclusão</h2>
                     <p>Ajude pacientes a encontrar profissionais com quem se identificam</p>
+                    <div className="optional-badge">
+                      ℹ️ Todos os campos desta etapa são <strong>opcionais</strong>
+                    </div>
+                  </div>
+
+                  {/* CRP - SOMENTE LEITURA */}
+                  <div className="info-box crp-info" style={{ marginBottom: '32px' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                      <p><strong>CRP cadastrado:</strong> {crpNumber || 'Carregando...'}</p>
+                      <p style={{ fontSize: '12px', color: '#9b8fab', marginTop: '4px' }}>
+                        O número do CRP não pode ser alterado. Se precisar corrigir, entre em contato com o suporte.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="form-group">
-                    <label>Cor/Raça *</label>
+                    <label>Gênero</label>
+                    <select value={gender} onChange={(e) => setGender(e.target.value)}>
+                      <option value="">Prefiro não informar</option>
+                      <option value="Feminino">Feminino</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="Não-binário">Não-binário</option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cor/Raça</label>
                     <select value={race} onChange={(e) => setRace(e.target.value)}>
-                      <option value="">Selecione</option>
+                      <option value="">Prefiro não informar</option>
                       <option value="Branca">Branca</option>
                       <option value="Preta">Preta</option>
                       <option value="Parda">Parda</option>
                       <option value="Amarela">Amarela</option>
                       <option value="Indígena">Indígena</option>
-                      <option value="Prefiro não informar">Prefiro não informar</option>
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label>Orientação Sexual *</label>
+                    <label>Orientação Sexual</label>
                     <select value={sexualOrientation} onChange={(e) => setSexualOrientation(e.target.value)}>
-                      <option value="">Selecione</option>
+                      <option value="">Prefiro não informar</option>
                       <option value="Heterossexual">Heterossexual</option>
                       <option value="Homossexual">Homossexual</option>
                       <option value="Bissexual">Bissexual</option>
                       <option value="Pansexual">Pansexual</option>
                       <option value="Assexual">Assexual</option>
                       <option value="Outra">Outra</option>
-                      <option value="Prefiro não informar">Prefiro não informar</option>
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label>Pronomes de Tratamento *</label>
+                    <label>Pronomes de Tratamento</label>
                     <select value={pronouns} onChange={(e) => setPronouns(e.target.value)}>
-                      <option value="">Selecione</option>
+                      <option value="">Prefiro não informar</option>
                       <option value="Ele/Dele">Ele/Dele</option>
                       <option value="Ela/Dela">Ela/Dela</option>
                       <option value="Elu/Delu">Elu/Delu</option>
                     </select>
+                  </div>
+
+                  <div className="info-box" style={{ marginTop: '24px' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                    </svg>
+                    <p>
+                      <strong>Por que pedimos isso?</strong><br/>
+                      Esses dados ajudam pacientes a encontrar profissionais com os quais possam se identificar melhor, criando um ambiente mais acolhedor e inclusivo.
+                    </p>
                   </div>
                 </div>
               )}
@@ -926,6 +952,17 @@ setMessage({ type: 'error', text: msg })
           font-size: 15px;
         }
 
+        .optional-badge {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+          border: 2px solid rgba(59, 130, 246, 0.3);
+          border-radius: 10px;
+          padding: 12px 16px;
+          font-size: 14px;
+          color: #1e40af;
+          margin-top: 12px;
+          line-height: 1.5;
+        }
+
         .premium-info-box {
           background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);
           border: 2px solid rgba(251, 191, 36, 0.3);
@@ -1096,6 +1133,15 @@ setMessage({ type: 'error', text: msg })
           border-radius: 10px;
           border: 1px solid rgba(59, 130, 246, 0.1);
           margin-bottom: 24px;
+        }
+
+        .info-box.crp-info {
+          background: rgba(34, 197, 94, 0.05);
+          border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .info-box.crp-info svg {
+          color: #22c55e;
         }
 
         .info-box svg {

@@ -169,13 +169,23 @@ export default function CompletarPerfilParte3() {
 
       setAvatarUrl(publicUrl)
 
-      // Salvar URL no banco
-      const { error: updateError } = await supabase
+      // ✅ SALVAR EM AMBOS OS LUGARES
+      
+      // 1. Salvar na tabela psychologists
+      const { error: psychError } = await supabase
         .from('psychologists')
         .update({ avatar_url: publicUrl })
         .eq('user_id', userId)
 
-      if (updateError) throw updateError
+      if (psychError) throw psychError
+
+      // 2. Salvar na tabela profiles (NOVO!)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', userId)
+
+      if (profileError) throw profileError
 
       setMessage({ type: 'success', text: '✓ Foto enviada com sucesso!' })
       

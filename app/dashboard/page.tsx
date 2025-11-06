@@ -16,11 +16,12 @@ interface PsychologistData {
   id: string
   crp: string
   specialties: string[]
-  approaches: string[]  // ✅ PLURAL
+  approaches: string[]
   price_per_session: number
   short_bio: string
   full_bio: string
-  education_list: { title: string; year: string }[]  // ✅ TIPO CORRETO
+  education_list: { title: string; year: string }[]
+  gender: string
   race: string
   sexual_orientation: string
   pronouns: string
@@ -180,20 +181,17 @@ export default function DashboardPage() {
   }
 
   const checkProfileCompletion = (data: PsychologistData) => {
-    // PARTE 1 - Verificações
+    // PARTE 1 - Perfil Profissional
     const parte1Checks = [
       { complete: data.specialties && data.specialties.length > 0, label: 'Áreas de especialização' },
       { complete: data.approaches && data.approaches.length > 0, label: 'Abordagens terapêuticas' },
       { complete: data.education_list && data.education_list.length > 0, label: 'Formações e cursos' },
       { complete: !!data.short_bio && data.short_bio.trim() !== '', label: 'Biografia resumida' },
       { complete: !!data.full_bio && data.full_bio.trim() !== '', label: 'Biografia completa' },
-      { complete: data.price_per_session > 0, label: 'Valor da sessão' },
-      { complete: !!data.race && data.race.trim() !== '', label: 'Cor/Raça' },
-      { complete: !!data.sexual_orientation && data.sexual_orientation.trim() !== '', label: 'Orientação sexual' },
-      { complete: !!data.pronouns && data.pronouns.trim() !== '', label: 'Pronomes' }
+      { complete: data.price_per_session > 0, label: 'Valor da sessão' }
     ]
 
-    // PARTE 2 - Verificações
+    // PARTE 2 - Logística e Pagamentos
     const parte2Checks = [
       { complete: data.age_groups && data.age_groups.length > 0, label: 'Faixas etárias atendidas' },
       { complete: data.modality && data.modality.length > 0, label: 'Modalidade de atendimento' },
@@ -201,7 +199,7 @@ export default function DashboardPage() {
       { complete: !!data.pix_key && data.pix_key.trim() !== '', label: 'Chave PIX' }
     ]
 
-    // PARTE 3 - Verificações
+    // PARTE 3 - Documentos e Plano
     const parte3Checks = [
       { complete: !!data.avatar_url && data.avatar_url.trim() !== '', label: 'Foto de perfil' },
       { complete: !!data.crp_document_url && data.crp_document_url.trim() !== '', label: 'Comprovante do CRP' },
@@ -287,7 +285,6 @@ export default function DashboardPage() {
     )
   }
 
-  // Função para determinar próximo passo
   const getNextStepUrl = () => {
     if (!profileCompletion.parte1Complete) return '/completar-perfil/parte-1'
     if (!profileCompletion.parte2Complete) return '/completar-perfil/parte-2'
@@ -296,7 +293,7 @@ export default function DashboardPage() {
   }
 
   const getNextStepLabel = () => {
-    if (!profileCompletion.parte1Complete) return 'Começar Parte 1'
+    if (!profileCompletion.parte1Complete) return 'Começar Cadastro - Parte 1'
     if (!profileCompletion.parte2Complete) return 'Continuar para Parte 2'
     if (!profileCompletion.parte3Complete) return 'Continuar para Parte 3'
     return 'Perfil Completo'
@@ -338,13 +335,15 @@ export default function DashboardPage() {
                 <p>Bem-vindo ao seu painel de controle</p>
               </div>
             </div>
-            <Link href="/perfil" className="btn-profile">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              Editar Perfil
-            </Link>
+            {profileCompletion.isComplete && (
+              <Link href="/alterar-cadastro/parte-1" className="btn-profile">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Alterar Cadastro
+              </Link>
+            )}
           </div>
 
           {/* Alerta de Perfil Incompleto */}
@@ -352,8 +351,8 @@ export default function DashboardPage() {
             <div className="alert-card incomplete">
               <div className="alert-icon">⚠️</div>
               <div className="alert-content">
-                <h3>Complete seu perfil para ficar visível</h3>
-                <p>Você precisa completar algumas informações para que pacientes possam te encontrar</p>
+                <h3>Complete seu cadastro para ficar visível</h3>
+                <p>Complete todas as informações para que pacientes possam te encontrar</p>
                 
                 <div className="progress-bar-container">
                   <div className="progress-bar-bg">
@@ -362,30 +361,33 @@ export default function DashboardPage() {
                   <span className="progress-text">{profileCompletion.percentage}% completo</span>
                 </div>
 
-                {/* Indicador de partes */}
                 <div className="parts-status">
                   <div className={`part-badge ${profileCompletion.parte1Complete ? 'complete' : 'incomplete'}`}>
                     {profileCompletion.parte1Complete ? '✓' : '○'} Parte 1 - Perfil Profissional
                   </div>
                   <div className={`part-badge ${profileCompletion.parte2Complete ? 'complete' : 'incomplete'}`}>
-                    {profileCompletion.parte2Complete ? '✓' : '○'} Parte 2 - Logística e Pagamento
+                    {profileCompletion.parte2Complete ? '✓' : '○'} Parte 2 - Logística e Pagamentos
                   </div>
                   <div className={`part-badge ${profileCompletion.parte3Complete ? 'complete' : 'incomplete'}`}>
                     {profileCompletion.parte3Complete ? '✓' : '○'} Parte 3 - Documentos e Plano
                   </div>
                 </div>
 
-                <div className="missing-items">
-                  <strong>Faltam:</strong>
-                  <ul>
-                    {profileCompletion.missing.map((item, idx) => (
-                      <li key={idx}>• {item}</li>
-                    ))}
-                  </ul>
-                </div>
+                {profileCompletion.missing.length > 0 && (
+                  <div className="missing-items">
+                    <strong>Faltam {profileCompletion.missing.length} item(ns):</strong>
+                    <ul>
+                      {profileCompletion.missing.slice(0, 5).map((item, idx) => (
+                        <li key={idx}>• {item}</li>
+                      ))}
+                      {profileCompletion.missing.length > 5 && (
+                        <li>• E mais {profileCompletion.missing.length - 5} itens...</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
               </div>
               
-              {/* Botão inteligente - vai para a próxima parte incompleta */}
               <Link 
                 href={getNextStepUrl()} 
                 className="btn-complete"
@@ -403,19 +405,19 @@ export default function DashboardPage() {
               <div className="alert-content">
                 {psychologistData.approval_status === 'pending' && (
                   <>
-                    <h3>Aguardando aprovação</h3>
-                    <p>Seu perfil está completo e em análise. Em breve você estará visível para os pacientes!</p>
+                    <h3>Cadastro completo! Aguardando aprovação</h3>
+                    <p>Seu perfil está em análise pela nossa equipe. Em breve você estará visível para os pacientes!</p>
                     <div className="plan-info">
-                      <strong>Plano escolhido:</strong> {psychologistData.plan_type === 'premium' ? 'Premium 💎' : 'Essencial'}
+                      <strong>Plano escolhido:</strong> {psychologistData.plan_type === 'premium' ? '💎 Premium' : '⭐ Essencial'}
                     </div>
                   </>
                 )}
                 {psychologistData.approval_status === 'approved' && psychologistData.is_active && (
                   <>
-                    <h3>Perfil ativo! 🎉</h3>
-                    <p>Seu perfil está aprovado e visível para pacientes. Aguarde os agendamentos chegarem!</p>
+                    <h3>Perfil ativo e visível! 🎉</h3>
+                    <p>Seu perfil está aprovado e pacientes já podem te encontrar. Aguarde os agendamentos!</p>
                     <div className="plan-info">
-                      <strong>Plano ativo:</strong> {psychologistData.plan_type === 'premium' ? 'Premium 💎' : 'Essencial'}
+                      <strong>Plano ativo:</strong> {psychologistData.plan_type === 'premium' ? '💎 Premium' : '⭐ Essencial'}
                     </div>
                   </>
                 )}
@@ -425,12 +427,18 @@ export default function DashboardPage() {
                     <p>Entre em contato com o suporte para ativar seu perfil</p>
                   </>
                 )}
+                {psychologistData.approval_status === 'rejected' && (
+                  <>
+                    <h3>Cadastro rejeitado</h3>
+                    <p>Entre em contato com o suporte para mais informações</p>
+                  </>
+                )}
               </div>
             </div>
           )}
 
           {/* Stats Cards */}
-          {psychologistData && (
+          {psychologistData && profileCompletion.isComplete && (
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-icon sessions">
@@ -475,62 +483,60 @@ export default function DashboardPage() {
           )}
 
           {/* Upcoming Appointments */}
-          <div className="section-card">
-            <div className="section-header">
-              <div>
-                <h2>Próximas Sessões</h2>
-                <p>Seus atendimentos agendados</p>
+          {profileCompletion.isComplete && (
+            <div className="section-card">
+              <div className="section-header">
+                <div>
+                  <h2>Próximas Sessões</h2>
+                  <p>Seus atendimentos agendados</p>
+                </div>
+                {upcomingAppointments.length > 0 && (
+                  <span className="count-badge">{upcomingAppointments.length}</span>
+                )}
               </div>
-              {upcomingAppointments.length > 0 && (
-                <span className="count-badge">{upcomingAppointments.length}</span>
-              )}
-            </div>
 
-            {upcomingAppointments.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">📅</div>
-                <h3>Nenhuma sessão agendada</h3>
-                <p>
-                  {profileCompletion.isComplete 
-                    ? 'Aguardando novos agendamentos de pacientes' 
-                    : 'Complete seu perfil para começar a receber agendamentos'}
-                </p>
-              </div>
-            ) : (
-              <div className="appointments-list">
-                {upcomingAppointments.map(apt => (
-                  <div key={apt.id} className="appointment-card">
-                    <div className="appointment-avatar">
-                      {apt.patient?.avatar_url ? (
-                        <img src={apt.patient.avatar_url} alt="Avatar" />
-                      ) : (
-                        <div className="avatar-placeholder">
-                          {getInitials(apt.patient?.full_name || 'P')}
+              {upcomingAppointments.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">📅</div>
+                  <h3>Nenhuma sessão agendada</h3>
+                  <p>Aguardando novos agendamentos de pacientes</p>
+                </div>
+              ) : (
+                <div className="appointments-list">
+                  {upcomingAppointments.map(apt => (
+                    <div key={apt.id} className="appointment-card">
+                      <div className="appointment-avatar">
+                        {apt.patient?.avatar_url ? (
+                          <img src={apt.patient.avatar_url} alt="Avatar" />
+                        ) : (
+                          <div className="avatar-placeholder">
+                            {getInitials(apt.patient?.full_name || 'P')}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="appointment-info">
+                        <h3>{apt.patient?.full_name}</h3>
+                        <div className="appointment-datetime">
+                          <span>📅 {formatDate(apt.appointment_date)}</span>
+                          <span>🕐 {formatTime(apt.appointment_time)}</span>
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    <div className="appointment-info">
-                      <h3>{apt.patient?.full_name}</h3>
-                      <div className="appointment-datetime">
-                        <span>📅 {formatDate(apt.appointment_date)}</span>
-                        <span>🕐 {formatTime(apt.appointment_time)}</span>
+                      <div className="appointment-actions">
+                        <span className={`status-badge ${getStatusBadge(apt.status).class}`}>
+                          {getStatusBadge(apt.status).text}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="appointment-actions">
-                      <span className={`status-badge ${getStatusBadge(apt.status).class}`}>
-                        {getStatusBadge(apt.status).text}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Past Appointments */}
-          {pastAppointments.length > 0 && (
+          {profileCompletion.isComplete && pastAppointments.length > 0 && (
             <div className="section-card">
               <div className="section-header">
                 <div>
@@ -630,7 +636,6 @@ const styles = `
     z-index: 1;
   }
 
-  /* Header */
   .dashboard-header {
     display: flex;
     align-items: center;
@@ -701,7 +706,6 @@ const styles = `
     box-shadow: 0 4px 16px rgba(124, 101, 181, 0.15);
   }
 
-  /* Alert Card */
   .alert-card {
     background: white;
     border-radius: 16px;
@@ -848,6 +852,7 @@ const styles = `
     border-radius: 8px;
     font-size: 14px;
     margin-top: 12px;
+    color: #6b5d7a;
   }
 
   .plan-info strong {
@@ -874,7 +879,6 @@ const styles = `
     box-shadow: 0 6px 24px rgba(124, 101, 181, 0.4);
   }
 
-  /* Stats Grid */
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -952,7 +956,6 @@ const styles = `
     font-weight: 500;
   }
 
-  /* Section Card */
   .section-card {
     background: white;
     border-radius: 20px;
@@ -996,7 +999,6 @@ const styles = `
     box-shadow: 0 2px 8px rgba(124, 101, 181, 0.25);
   }
 
-  /* Empty State */
   .empty-state {
     text-align: center;
     padding: 60px 20px;
@@ -1020,7 +1022,6 @@ const styles = `
     font-size: 15px;
   }
 
-  /* Appointments List */
   .appointments-list {
     display: flex;
     flex-direction: column;
@@ -1140,7 +1141,6 @@ const styles = `
     background: rgba(124, 101, 181, 0.05);
   }
 
-  /* Loading */
   .loading {
     text-align: center;
     padding: 80px 20px;
@@ -1165,7 +1165,6 @@ const styles = `
     font-size: 16px;
   }
 
-  /* Responsive */
   @media (max-width: 768px) {
     .dashboard-page {
       padding: 100px 16px 40px;
