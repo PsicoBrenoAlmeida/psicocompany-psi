@@ -45,6 +45,14 @@ export default function CompletarPerfilParte3() {
     loadUserData()
   }, [])
 
+  // ✅ Cleanup para mensagens automáticas
+  useEffect(() => {
+    if (message) {
+      const timeoutId = setTimeout(() => setMessage(null), 3000)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [message])
+
   const loadUserData = async () => {
     try {
       setInitialLoading(true)
@@ -84,9 +92,8 @@ export default function CompletarPerfilParte3() {
         }
       } else {
         setMessage({ type: 'error', text: 'Complete as partes anteriores primeiro!' })
-        setTimeout(() => {
-          router.push('/completar-perfil/parte-1')
-        }, 2000)
+        // ✅ Redireciona imediatamente sem setTimeout
+        router.push('/completar-perfil/parte-1')
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -169,23 +176,26 @@ export default function CompletarPerfilParte3() {
 
       setAvatarUrl(publicUrl)
 
-      // ✅ SALVAR EM AMBOS OS LUGARES
-      
-      // 1. Salvar na tabela psychologists
-      const { error: psychError } = await supabase
-        .from('psychologists')
-        .update({ avatar_url: publicUrl })
-        .eq('user_id', userId)
+      // ✅ USAR Promise.all PARA GARANTIR ATOMICIDADE
+      const [psychResult, profileResult] = await Promise.all([
+        supabase
+          .from('psychologists')
+          .update({ avatar_url: publicUrl })
+          .eq('user_id', userId),
+        supabase
+          .from('profiles')
+          .update({ avatar_url: publicUrl })
+          .eq('user_id', userId)
+      ])
 
-      if (psychError) throw psychError
-
-      // 2. Salvar na tabela profiles (NOVO!)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('user_id', userId)
-
-      if (profileError) throw profileError
+      // ✅ Verificar ambos os resultados
+      if (psychResult.error || profileResult.error) {
+        console.error('Erro ao salvar avatar:', { 
+          psychError: psychResult.error, 
+          profileError: profileResult.error 
+        })
+        throw new Error('Erro ao salvar avatar no banco de dados')
+      }
 
       setMessage({ type: 'success', text: '✓ Foto enviada com sucesso!' })
       
@@ -381,8 +391,6 @@ export default function CompletarPerfilParte3() {
       setLoading(true)
       setMessage(null)
 
-      console.log('🚀 FINALIZANDO CADASTRO...')
-
       const updateData = {
         plan_type: selectedPlan,
         monthly_fee: selectedPlan === 'premium' ? 300 : null,
@@ -401,16 +409,13 @@ export default function CompletarPerfilParte3() {
         throw error
       }
 
-      console.log('✅ CADASTRO COMPLETO!')
-
       setMessage({ 
         type: 'success', 
         text: '✓ Cadastro enviado! Aguarde aprovação da equipe.' 
       })
 
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 2500)
+      // ✅ Redireciona imediatamente sem setTimeout
+      router.push('/dashboard')
 
     } catch (error) {
       console.error('🔴 ERRO:', error)
@@ -419,8 +424,7 @@ export default function CompletarPerfilParte3() {
         type: 'error', 
         text: errorMessage
       })
-    } finally {
-      setLoading(false)
+      setLoading(false) // ✅ Re-habilita em caso de erro
     }
   }
 

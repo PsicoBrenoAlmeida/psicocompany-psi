@@ -20,7 +20,6 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined)
 export const useToast = () => {
   const context = useContext(ToastContext)
   if (!context) {
-    // Retorna funções dummy ao invés de jogar erro
     console.warn('useToast sendo usado fora do ToastProvider. As notificações não funcionarão.')
     return {
       showToast: () => {},
@@ -30,11 +29,19 @@ export const useToast = () => {
   return context
 }
 
+type ToastPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
+
 interface ToastProviderProps {
   children: ReactNode
+  position?: ToastPosition
+  maxToasts?: number
 }
 
-export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
+export const ToastProvider: React.FC<ToastProviderProps> = ({ 
+  children,
+  position = 'top-right',
+  maxToasts = 3
+}) => {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const showToast = useCallback((
@@ -45,14 +52,20 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     const id = `toast-${Date.now()}-${Math.random()}`
     const newToast: Toast = { id, message, type, duration }
     
-    setToasts(prev => [...prev, newToast])
+    setToasts(prev => {
+      // Remove toast duplicado (mesma mensagem nos últimos 2 segundos)
+      const filtered = prev.filter(t => t.message !== message)
+      // Adiciona novo toast e limita quantidade
+      const updated = [...filtered, newToast]
+      return updated.slice(-maxToasts)
+    })
     
     if (duration > 0) {
       setTimeout(() => {
-        hideToast(id)
+        setToasts(prev => prev.filter(toast => toast.id !== id))
       }, duration)
     }
-  }, [])
+  }, [maxToasts])
 
   const hideToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id))
@@ -104,12 +117,25 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     }
   }
 
+  const getPositionClass = () => {
+    switch (position) {
+      case 'top-right':
+        return 'toast-position-top-right'
+      case 'top-left':
+        return 'toast-position-top-left'
+      case 'bottom-right':
+        return 'toast-position-bottom-right'
+      case 'bottom-left':
+        return 'toast-position-bottom-left'
+    }
+  }
+
   return (
     <ToastContext.Provider value={{ showToast, hideToast }}>
       {children}
       
       {toasts.length > 0 && (
-        <div className="toast-container">
+        <div className={`toast-container ${getPositionClass()}`}>
           {toasts.map(toast => (
             <div
               key={toast.id}
@@ -140,13 +166,32 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       <style jsx>{`
         .toast-container {
           position: fixed;
-          top: 80px;
-          right: 24px;
           z-index: 9999;
           display: flex;
           flex-direction: column;
           gap: 12px;
           pointer-events: none;
+        }
+
+        /* Posições */
+        .toast-position-top-right {
+          top: 80px;
+          right: 24px;
+        }
+
+        .toast-position-top-left {
+          top: 80px;
+          left: 24px;
+        }
+
+        .toast-position-bottom-right {
+          bottom: 24px;
+          right: 24px;
+        }
+
+        .toast-position-bottom-left {
+          bottom: 24px;
+          left: 24px;
         }
 
         .toast {
@@ -176,9 +221,47 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
           }
         }
 
+        /* Animações para diferentes posições */
+        .toast-position-top-left .toast,
+        .toast-position-bottom-left .toast {
+          animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-100%) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+        }
+
+        .toast-position-bottom-right .toast,
+        .toast-position-bottom-left .toast {
+          animation: slideInBottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideInBottom {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
         .toast:hover {
           transform: translateX(-4px);
           box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+        }
+
+        .toast-position-top-left .toast:hover,
+        .toast-position-bottom-left .toast:hover {
+          transform: translateX(4px);
         }
 
         .toast-success {
@@ -246,26 +329,23 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
         /* Responsivo */
         @media (max-width: 640px) {
           .toast-container {
-            top: auto;
+            left: 16px !important;
+            right: 16px !important;
+          }
+
+          .toast-position-top-right,
+          .toast-position-top-left {
+            top: 20px;
+          }
+
+          .toast-position-bottom-right,
+          .toast-position-bottom-left {
             bottom: 20px;
-            left: 16px;
-            right: 16px;
           }
 
           .toast {
             min-width: auto;
             max-width: 100%;
-          }
-
-          @keyframes slideIn {
-            from {
-              opacity: 0;
-              transform: translateY(20px) scale(0.95);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
           }
         }
 

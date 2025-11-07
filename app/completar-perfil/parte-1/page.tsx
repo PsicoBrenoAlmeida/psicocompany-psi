@@ -110,6 +110,14 @@ export default function CompletarPerfilParte1() {
     loadUserData()
   }, [])
 
+  // ✅ Cleanup para mensagens automáticas
+  useEffect(() => {
+    if (message) {
+      const timeoutId = setTimeout(() => setMessage(null), 3000)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [message])
+
   const loadUserData = async () => {
     try {
       setInitialLoading(true)
@@ -169,7 +177,6 @@ export default function CompletarPerfilParte1() {
         setSpecialties([...specialties, specialty])
       } else {
         setMessage({ type: 'error', text: 'Máximo de 10 áreas de especialização' })
-        setTimeout(() => setMessage(null), 3000)
       }
     }
   }
@@ -182,7 +189,6 @@ export default function CompletarPerfilParte1() {
         setApproaches([...approaches, approach])
       } else {
         setMessage({ type: 'error', text: 'Máximo de 5 abordagens terapêuticas' })
-        setTimeout(() => setMessage(null), 3000)
       }
     }
   }
@@ -190,7 +196,6 @@ export default function CompletarPerfilParte1() {
   const addEducation = () => {
     if (!educationTitle.trim() || !educationYear.trim()) {
       setMessage({ type: 'error', text: 'Preencha título e ano da formação' })
-      setTimeout(() => setMessage(null), 3000)
       return
     }
     setEducationList([...educationList, { title: educationTitle, year: educationYear }])
@@ -265,19 +270,12 @@ export default function CompletarPerfilParte1() {
   }
 
   const handleContinueToParte2 = async () => {
-    console.log('🚀 INÍCIO')
-
-    if (!validateStep4()) {
-      console.log('❌ Validação falhou')
-      return
-    }
+    if (!validateStep4()) return
 
     setLoading(true)
     setMessage(null)
 
     try {
-      console.log('💾 SALVANDO...')
-      console.log('👤 userId:', userId)
       if (!userId) throw new Error('Usuário não identificado')
 
       const price = Number(pricePerSession)
@@ -298,35 +296,25 @@ export default function CompletarPerfilParte1() {
         pronouns: pronouns || null,
       }
 
-      console.log('📦 Dados:', updateData)
-
-      // 🔎 Checagem de existência
-      console.log('🔎 Verificando se já existe registro do psicólogo...')
+      // Checagem de existência
       const { data: existing, error: checkErr } = await supabase
         .from('psychologists')
         .select('user_id')
         .eq('user_id', userId)
         .maybeSingle()
 
-      if (checkErr) {
-        console.error('❌ Erro ao checar existência:', checkErr)
-        throw checkErr
-      }
-      console.log('🔎 Existe?', !!existing)
+      if (checkErr) throw checkErr
 
       let data, error
 
       if (!existing) {
-        console.log('🆕 Inserindo registro...')
         const insertPayload = { user_id: userId, ...updateData }
-
         ;({ data, error } = await supabase
           .from('psychologists')
           .insert([insertPayload])
           .select()
           .single())
       } else {
-        console.log('✏️ Atualizando registro...')
         ;({ data, error } = await supabase
           .from('psychologists')
           .update(updateData)
@@ -335,21 +323,16 @@ export default function CompletarPerfilParte1() {
           .single())
       }
 
-      console.log('✅ Resposta recebida!', { data, error })
-
       if (error) throw error
-      if (!data) throw new Error('Nenhum registro foi salvo/atualizado (verifique policies e user_id).')
+      if (!data) throw new Error('Nenhum registro foi salvo/atualizado.')
 
-      console.log('🎉 SUCESSO!')
       setMessage({ type: 'success', text: 'Dados salvos com sucesso!' })
-
-      setTimeout(() => {
-        console.log('➡️ Redirecionando para Parte 2...')
-        router.push('/completar-perfil/parte-2')
-      }, 1200)
+      
+      // ✅ Redireciona imediatamente sem setTimeout
+      router.push('/completar-perfil/parte-2')
 
     } catch (error) {
-      console.error('🔴 ERRO COMPLETO:', error)
+      console.error('🔴 ERRO:', error)
 
       let msg = 'Erro ao salvar: '
 
@@ -358,29 +341,13 @@ export default function CompletarPerfilParte1() {
         
         if (err.message?.toLowerCase?.().includes('jwt')) {
           msg = 'Sua sessão expirou. Faça login novamente.'
-          setTimeout(() => router.push('/login'), 1500)
+          router.push('/login')
         } else if (
           err.message?.toLowerCase?.().includes('permission') ||
           err.message?.toLowerCase?.().includes('policy') ||
           err.code === 'PGRST301'
         ) {
-          msg = 'Você não tem permissão. Verifique as policies de RLS da tabela psychologists.'
-        } else if (
-          err.code === '23505' ||
-          err.message?.toLowerCase?.().includes('unique') ||
-          err.message?.toLowerCase?.().includes('duplicate')
-        ) {
-          msg = 'Violação de unicidade. Verifique UNIQUE em user_id ou registros duplicados.'
-        } else if (
-          err.code === '23502' ||
-          err.message?.toLowerCase?.().includes('not null')
-        ) {
-          msg = 'Erro de Preenchimento: Um campo obrigatório não foi enviado. Verifique o console.'
-        } else if (
-          err.message?.toLowerCase?.().includes('column') &&
-          err.message?.toLowerCase?.().includes('does not exist')
-        ) {
-          msg = 'Coluna inexistente no payload. Confira nomes e tipos das colunas.'
+          msg = 'Você não tem permissão. Verifique as policies de RLS.'
         } else if (err.message) {
           msg += err.message
         } else {
@@ -392,8 +359,7 @@ export default function CompletarPerfilParte1() {
       }
 
       setMessage({ type: 'error', text: msg })
-    } finally {
-      setLoading(false)
+      setLoading(false) // ✅ Re-habilita o botão em caso de erro
     }
   }
 

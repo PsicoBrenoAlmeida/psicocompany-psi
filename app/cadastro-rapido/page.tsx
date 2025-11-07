@@ -77,111 +77,110 @@ export default function CadastroRapidoPage() {
   }
 
   const handleSubmit = async () => {
-    if (!validateForm()) return
+  if (!validateForm()) return
 
-    try {
-      setLoading(true)
-      setMessage(null)
+  try {
+    setLoading(true)
+    setMessage(null)
 
-      console.log('🚀 INICIANDO CADASTRO RÁPIDO')
+    console.log('🚀 INICIANDO CADASTRO RÁPIDO')
 
-      // 1. Criar usuário no Supabase Auth
-      console.log('👤 Criando usuário...')
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            user_type: 'psychologist'
-          }
+    // 1. Criar usuário no Supabase Auth
+    console.log('👤 Criando usuário...')
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          user_type: 'psychologist'
         }
+      }
+    })
+
+    if (authError) {
+      console.error('❌ Erro no Auth:', authError)
+      throw authError
+    }
+    if (!authData.user) {
+      throw new Error('Erro ao criar usuário')
+    }
+
+    console.log('✅ Usuário criado:', authData.user.id)
+
+    // 2. Criar perfil básico
+    console.log('📝 Criando perfil...')
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        user_id: authData.user.id,
+        user_type: 'psychologist',
+        full_name: fullName,
+        email: email,
+        phone: phone
       })
 
-      if (authError) {
-        console.error('❌ Erro no Auth:', authError)
-        throw authError
-      }
-      if (!authData.user) {
-        throw new Error('Erro ao criar usuário')
-      }
+    if (profileError) {
+      console.error('❌ Erro no Profile:', profileError)
+      throw profileError
+    }
 
-      console.log('✅ Usuário criado:', authData.user.id)
+    console.log('✅ Perfil criado')
 
-      // 2. Criar perfil básico
-      console.log('📝 Criando perfil...')
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: authData.user.id,
-          user_type: 'psychologist',
-          full_name: fullName,
-          email: email,
-          phone: phone
-        })
-
-      if (profileError) {
-        console.error('❌ Erro no Profile:', profileError)
-        throw profileError
-      }
-
-      console.log('✅ Perfil criado')
-
-      // 3. Criar registro básico de psicólogo (dados mínimos)
-      console.log('🧠 Criando registro de psicólogo...')
-      const { error: psychologistError } = await supabase
-        .from('psychologists')
-        .insert({
-          user_id: authData.user.id,
-          crp: crp,
-          specialties: [],
-          approaches: [],
-          price_per_session: 0,
-          short_bio: '',
-          approval_status: 'pending',
-          is_active: false,
-          plan_type: 'basic'
-        })
-
-      if (psychologistError) {
-        console.error('❌ Erro no Psychologist:', psychologistError)
-        throw psychologistError
-      }
-
-      console.log('✅ Psicólogo criado')
-
-      // 4. Salvar lead (opcional, para tracking)
-      await supabase
-        .from('psychologist_leads')
-        .insert({
-          full_name: fullName,
-          email: email,
-          phone: phone,
-          crp: crp,
-          status: 'converted'
-        })
-
-      console.log('✅ CADASTRO CONCLUÍDO - REDIRECIONANDO')
-
-      setMessage({ 
-        type: 'success', 
-        text: 'Conta criada! Redirecionando...' 
+    // 3. Criar registro básico de psicólogo (dados mínimos)
+    console.log('🧠 Criando registro de psicólogo...')
+    const { error: psychologistError } = await supabase
+      .from('psychologists')
+      .insert({
+        user_id: authData.user.id,
+        crp: crp,
+        specialties: [],
+        approaches: [],
+        price_per_session: 0,
+        short_bio: '',
+        approval_status: 'pending',
+        is_active: false,
+        plan_type: 'basic'
       })
 
-      // 5. Redirecionar para dashboard (já está logado automaticamente)
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 1500)
+    if (psychologistError) {
+      console.error('❌ Erro no Psychologist:', psychologistError)
+      throw psychologistError
+    }
 
-    } catch (error) {
-  console.error('🔴 ERRO:', error)
-  const errorMessage = error instanceof Error ? error.message : 'Erro ao criar conta. Tente novamente.'
-  setMessage({ 
-    type: 'error', 
-    text: errorMessage
-  })
+    console.log('✅ Psicólogo criado')
+
+    // 4. Salvar lead (opcional, para tracking)
+    await supabase
+      .from('psychologist_leads')
+      .insert({
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        crp: crp,
+        status: 'converted'
+      })
+
+    console.log('✅ CADASTRO CONCLUÍDO - REDIRECIONANDO')
+
+    setMessage({ 
+      type: 'success', 
+      text: 'Conta criada! Redirecionando...' 
+    })
+
+    // 5. Redirecionar para dashboard (redireciona imediatamente, sem delay)
+    router.push('/dashboard')
+
+  } catch (error) {
+    console.error('🔴 ERRO:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Erro ao criar conta. Tente novamente.'
+    setMessage({ 
+      type: 'error', 
+      text: errorMessage
+    })
+    setLoading(false) // ✅ Importante: re-habilita o botão em caso de erro
   }
-  }
+}
 
   return (
     <>

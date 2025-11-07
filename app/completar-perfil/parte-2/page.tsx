@@ -54,6 +54,14 @@ export default function CompletarPerfilParte2() {
     loadUserData()
   }, [])
 
+  // ✅ Cleanup para mensagens automáticas
+  useEffect(() => {
+    if (message) {
+      const timeoutId = setTimeout(() => setMessage(null), 3000)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [message])
+
   const loadUserData = async () => {
     try {
       setInitialLoading(true)
@@ -89,9 +97,8 @@ export default function CompletarPerfilParte2() {
       } else {
         // Se não tem dados, significa que não completou a Parte 1
         setMessage({ type: 'error', text: 'Complete a Parte 1 primeiro!' })
-        setTimeout(() => {
-          router.push('/completar-perfil/parte-1')
-        }, 2000)
+        // ✅ Redireciona imediatamente sem setTimeout
+        router.push('/completar-perfil/parte-1')
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -100,19 +107,38 @@ export default function CompletarPerfilParte2() {
     }
   }
 
+  // ✅ VALIDAÇÃO PREMIUM CORRIGIDA
   const toggleAgeGroup = (group: string) => {
     if (ageGroups.includes(group)) {
       setAgeGroups(ageGroups.filter(g => g !== group))
     } else {
+      // Verificar se é premium ANTES de adicionar
+      const groupData = ageGroupsList.find(g => g.value === group)
+      if (groupData?.premium) {
+        setMessage({ 
+          type: 'error', 
+          text: '⚠️ Esta faixa etária requer o Plano Premium. Você poderá selecioná-la após escolher seu plano.' 
+        })
+        return // ✅ Bloqueia a adição
+      }
       setAgeGroups([...ageGroups, group])
     }
   }
 
+  // ✅ VALIDAÇÃO PREMIUM PARA MODALIDADE
   const toggleModality = (mod: string) => {
     if (modality.includes(mod)) {
       if (mod === 'online') return // Online é obrigatório
       setModality(modality.filter(m => m !== mod))
     } else {
+      // Verificar se é premium ANTES de adicionar
+      if (mod === 'presencial' || mod === 'hibrido') {
+        setMessage({ 
+          type: 'error', 
+          text: '⚠️ Atendimento presencial e híbrido requerem o Plano Premium. Você poderá selecioná-los após escolher seu plano.' 
+        })
+        return // ✅ Bloqueia a adição
+      }
       setModality([...modality, mod])
     }
   }
@@ -171,8 +197,6 @@ export default function CompletarPerfilParte2() {
       setLoading(true)
       setMessage(null)
 
-      console.log('💾 Salvando Parte 2...')
-
       const updateData = {
         age_groups: ageGroups,
         modality: modality,
@@ -197,20 +221,17 @@ export default function CompletarPerfilParte2() {
         throw error
       }
 
-      console.log('✅ Parte 2 salva!')
-
-      // Redirecionar para Parte 3
+      // ✅ Redireciona imediatamente sem setTimeout
       router.push('/completar-perfil/parte-3')
 
     } catch (error) {
-  console.error('🔴 ERRO:', error)
-  const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar dados'
-  setMessage({ 
-    type: 'error', 
-    text: errorMessage
-  })
-} finally {
-      setLoading(false)
+      console.error('🔴 ERRO:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar dados'
+      setMessage({ 
+        type: 'error', 
+        text: errorMessage
+      })
+      setLoading(false) // ✅ Re-habilita em caso de erro
     }
   }
 
