@@ -4,7 +4,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import ToastProvider from '@/components/ui/Toast'
+import ToastClientProvider from '@/components/providers/ToastClientProvider'
 import AuthErrorHandler from '@/components/auth/AuthErrorHandler'
 import EmergencyReset from '@/components/auth/EmergencyReset'
 
@@ -62,7 +62,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Botão de emergência (só aparece se travar) */}
         <EmergencyReset />
         
-        <ToastProvider position="top-right" maxToasts={3}>
+        {/* Toast Provider como Client Component */}
+        <ToastClientProvider>
           <a href="#main-content" className="skip-to-content">Pular para o conteúdo principal</a>
 
           <div className="min-h-screen flex flex-col">
@@ -72,7 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </main>
             <Footer />
           </div>
-        </ToastProvider>
+        </ToastClientProvider>
       </body>
     </html>
   )

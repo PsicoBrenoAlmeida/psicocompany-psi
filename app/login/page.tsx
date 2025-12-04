@@ -54,24 +54,50 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      console.log('🔐 Tentando fazer login...') // Debug
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(), // Remove espaços em branco
         password
       })
 
+      console.log('📊 Resposta do login:', { data, error }) // Debug
+
       if (error) {
-        const message = error.message === 'Invalid login credentials' 
-          ? 'E-mail ou senha incorretos' 
-          : error.message
+        console.error('❌ Erro no login:', error) // Debug
+        
+        // Mensagens de erro mais amigáveis
+        let message = 'Erro ao fazer login'
+        
+        if (error.message.includes('Invalid login credentials')) {
+          message = 'E-mail ou senha incorretos'
+        } else if (error.message.includes('Email not confirmed')) {
+          message = 'Por favor, confirme seu e-mail antes de fazer login'
+        } else if (error.message.includes('Invalid email')) {
+          message = 'E-mail inválido'
+        } else {
+          message = error.message
+        }
+        
         showToast(message, 'error')
-        setLoading(false)
-        return
+        return // Para aqui se houver erro
       }
 
+      // Se chegou aqui, login foi bem-sucedido
+      console.log('✅ Login bem-sucedido!') // Debug
       showToast('Login realizado com sucesso!', 'success')
-      router.push('/dashboard')
-    } catch (err) {
-      showToast('Ocorreu um erro ao fazer login. Tente novamente.', 'error')
+      
+      // Pequeno delay para o toast aparecer antes do redirect
+      setTimeout(() => {
+        router.push('/dashboard')
+        router.refresh() // Força atualização da sessão
+      }, 500)
+      
+    } catch (err: any) {
+      console.error('❌ Erro catch:', err) // Debug
+      showToast(err?.message || 'Ocorreu um erro ao fazer login. Tente novamente.', 'error')
+    } finally {
+      // Garante que loading seja resetado SEMPRE
       setLoading(false)
     }
   }
@@ -148,6 +174,7 @@ export default function LoginPage() {
                       }
                     }}
                     className={errors.email ? 'error' : ''}
+                    disabled={loading}
                   />
                   {errors.email && <span className="error-message">{errors.email}</span>}
                 </div>
@@ -164,11 +191,13 @@ export default function LoginPage() {
                         setErrors({...errors, password: undefined})
                       }}
                       className={errors.password ? 'error' : ''}
+                      disabled={loading}
                     />
                     <button
                       type="button"
                       className="password-toggle"
                       onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
                     >
                       {showPassword ? '👁️' : '👁️‍🗨️'}
                     </button>
@@ -183,6 +212,7 @@ export default function LoginPage() {
                       id="remember"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
+                      disabled={loading}
                     />
                     <label htmlFor="remember">Lembrar-me</label>
                   </div>
@@ -498,6 +528,11 @@ export default function LoginPage() {
           border-color: #ef4444;
         }
 
+        .form-group input:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
         .password-input {
           position: relative;
         }
@@ -520,8 +555,12 @@ export default function LoginPage() {
           transition: opacity 0.2s ease;
         }
 
-        .password-toggle:hover {
+        .password-toggle:hover:not(:disabled) {
           opacity: 1;
+        }
+
+        .password-toggle:disabled {
+          cursor: not-allowed;
         }
 
         .error-message {
@@ -550,6 +589,10 @@ export default function LoginPage() {
           height: 18px;
           accent-color: #7c65b5;
           cursor: pointer;
+        }
+
+        .checkbox-container input[type="checkbox"]:disabled {
+          cursor: not-allowed;
         }
 
         .checkbox-container label {

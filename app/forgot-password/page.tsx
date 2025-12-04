@@ -1,15 +1,8 @@
-
 'use client'
 
 import { useState } from 'react'
-import type { Metadata } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import { useToast } from '@/components/ui/Toast'
-
-export const metadata: Metadata = {
-  title: 'Esqueci minha senha',
-  description: 'Recupere o acesso à sua conta.',
-}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
