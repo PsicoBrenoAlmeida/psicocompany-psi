@@ -441,7 +441,10 @@ export default function AlterarCadastroParte1() {
                 <input
                   type="text"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => {
+                    const cleaned = e.target.value.replace(/[\u200B-\u200D\uFEFF]/g, '')
+                    setFullName(cleaned)
+                  }}
                 />
               </div>
 
@@ -573,24 +576,36 @@ export default function AlterarCadastroParte1() {
               <div className="form-group">
                 <label>Bio Resumida * (50-250 caracteres)</label>
                 <textarea
-                  placeholder="Descrição curta que aparecerá na busca"
-                  value={shortBio}
-                  onChange={(e) => setShortBio(e.target.value.slice(0, 250))}
-                  maxLength={250}
-                  rows={3}
-                />
+                    placeholder="Descrição curta que aparecerá na busca"
+                    value={shortBio}
+                    onChange={(e) => {
+                      const cleaned = e.target.value
+                        .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove caracteres invisíveis
+                        .replace(/\r\n/g, '\n') // Normaliza quebras de linha
+                        .slice(0, 250)
+                      setShortBio(cleaned)
+                    }}
+                    maxLength={250}
+                    rows={3}
+                  />
                 <span className="hint">{shortBio.length}/250 caracteres</span>
               </div>
 
               <div className="form-group">
                 <label>Bio Completa * (100-2000 caracteres)</label>
                 <textarea
-                  placeholder="Descrição detalhada do seu perfil"
-                  value={fullBio}
-                  onChange={(e) => setFullBio(e.target.value.slice(0, 2000))}
-                  maxLength={2000}
-                  rows={6}
-                />
+                    placeholder="Descrição detalhada do seu perfil"
+                    value={fullBio}
+                    onChange={(e) => {
+                      const cleaned = e.target.value
+                        .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove caracteres invisíveis
+                        .replace(/\r\n/g, '\n') // Normaliza quebras de linha
+                        .slice(0, 2000)
+                      setFullBio(cleaned)
+                    }}
+                    maxLength={2000}
+                    rows={6}
+                  />
                 <span className="hint">{fullBio.length}/2000 caracteres</span>
               </div>
 
