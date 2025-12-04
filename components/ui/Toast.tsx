@@ -1,7 +1,15 @@
 // components/ui/Toast.tsx
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  ReactNode,
+} from 'react'
 
 interface Toast {
   id: string
@@ -23,7 +31,7 @@ export const useToast = () => {
     console.warn('useToast sendo usado fora do ToastProvider. As notificações não funcionarão.')
     return {
       showToast: () => {},
-      hideToast: () => {}
+      hideToast: () => {},
     }
   }
   return context
@@ -35,40 +43,72 @@ interface ToastProviderProps {
   children: ReactNode
   position?: ToastPosition
   maxToasts?: number
+  dedupeWindowMs?: number // janela para evitar duplicados (default 2000ms)
 }
 
-export const ToastProvider: React.FC<ToastProviderProps> = ({ 
+export const ToastProvider: React.FC<ToastProviderProps> = ({
   children,
   position = 'top-right',
-  maxToasts = 3
+  maxToasts = 3,
+  dedupeWindowMs = 2000,
 }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  const showToast = useCallback((
-    message: string, 
-    type: Toast['type'] = 'info', 
-    duration = 5000
-  ) => {
-    const id = `toast-${Date.now()}-${Math.random()}`
-    const newToast: Toast = { id, message, type, duration }
-    
-    setToasts(prev => {
-      // Remove toast duplicado (mesma mensagem nos últimos 2 segundos)
-      const filtered = prev.filter(t => t.message !== message)
-      // Adiciona novo toast e limita quantidade
-      const updated = [...filtered, newToast]
-      return updated.slice(-maxToasts)
-    })
-    
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts(prev => prev.filter(toast => toast.id !== id))
-      }, duration)
+  // Armazena timeouts para limpar ao fechar/desmontar
+  const timeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // Guarda timestamp da última mensagem (para de-dupe por 2s)
+  const lastShownRef = useRef<Record<string, number>>({})
+
+  const genId = () => {
+    try {
+      return crypto.randomUUID()
+    } catch {
+      return `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`
     }
-  }, [maxToasts])
+  }
+
+  const showToast = useCallback(
+    (message: string, type: Toast['type'] = 'info', duration = 5000) => {
+      const now = Date.now()
+      const last = lastShownRef.current[message]
+      if (last && now - last < dedupeWindowMs) {
+        // Ignora duplicados mostrados há < dedupeWindowMs
+        return
+      }
+      lastShownRef.current[message] = now
+
+      const id = genId()
+      const newToast: Toast = { id, message, type, duration }
+
+      setToasts(prev => {
+        const updated = [...prev, newToast]
+        return updated.slice(-maxToasts)
+      })
+
+      if (duration > 0) {
+        timeoutsRef.current[id] = setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id))
+          delete timeoutsRef.current[id]
+        }, duration)
+      }
+    },
+    [dedupeWindowMs, maxToasts]
+  )
 
   const hideToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id))
+    if (timeoutsRef.current[id]) {
+      clearTimeout(timeoutsRef.current[id])
+      delete timeoutsRef.current[id]
+    }
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
+
+  // Limpa todos os timeouts ao desmontar
+  useEffect(() => {
+    return () => {
+      Object.values(timeoutsRef.current).forEach(clearTimeout)
+      timeoutsRef.current = {}
+    }
   }, [])
 
   const getIcon = (type: Toast['type']) => {
@@ -76,29 +116,29 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
       case 'success':
         return (
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="9" fill="#10B981" opacity="0.2"/>
-            <path d="M6 10L9 13L14 7" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="10" cy="10" r="9" fill="#10B981" opacity="0.2" />
+            <path d="M6 10L9 13L14 7" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )
       case 'error':
         return (
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="9" fill="#EF4444" opacity="0.2"/>
-            <path d="M7 7L13 13M13 7L7 13" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="10" cy="10" r="9" fill="#EF4444" opacity="0.2" />
+            <path d="M7 7L13 13M13 7L7 13" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" />
           </svg>
         )
       case 'warning':
         return (
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="9" fill="#F59E0B" opacity="0.2"/>
-            <path d="M10 6V11M10 14H10.01" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="10" cy="10" r="9" fill="#F59E0B" opacity="0.2" />
+            <path d="M10 6V11M10 14H10.01" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" />
           </svg>
         )
       case 'info':
         return (
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="9" fill="#3B82F6" opacity="0.2"/>
-            <path d="M10 9V14M10 6H10.01" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="10" cy="10" r="9" fill="#3B82F6" opacity="0.2" />
+            <path d="M10 9V14M10 6H10.01" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" />
           </svg>
         )
     }
@@ -130,10 +170,13 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
     }
   }
 
+  const getAriaLive = (type: Toast['type']) =>
+    type === 'error' || type === 'warning' ? 'assertive' : 'polite'
+
   return (
     <ToastContext.Provider value={{ showToast, hideToast }}>
       {children}
-      
+
       {toasts.length > 0 && (
         <div className={`toast-container ${getPositionClass()}`}>
           {toasts.map(toast => (
@@ -141,21 +184,20 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
               key={toast.id}
               className={`toast ${getColorClass(toast.type)}`}
               role="alert"
-              aria-live="polite"
+              aria-live={getAriaLive(toast.type) as 'polite' | 'assertive'}
+              data-type={toast.type}
             >
-              <div className="toast-icon">
-                {getIcon(toast.type)}
-              </div>
+              <div className="toast-icon">{getIcon(toast.type)}</div>
               <div className="toast-content">
                 <p className="toast-message">{toast.message}</p>
               </div>
-              <button 
+              <button
                 className="toast-close"
                 onClick={() => hideToast(toast.id)}
                 aria-label="Fechar notificação"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
@@ -174,34 +216,19 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
         }
 
         /* Posições */
-        .toast-position-top-right {
-          top: 80px;
-          right: 24px;
-        }
-
-        .toast-position-top-left {
-          top: 80px;
-          left: 24px;
-        }
-
-        .toast-position-bottom-right {
-          bottom: 24px;
-          right: 24px;
-        }
-
-        .toast-position-bottom-left {
-          bottom: 24px;
-          left: 24px;
-        }
+        .toast-position-top-right { top: 80px; right: 24px; }
+        .toast-position-top-left { top: 80px; left: 24px; }
+        .toast-position-bottom-right { bottom: 24px; right: 24px; }
+        .toast-position-bottom-left { bottom: 24px; left: 24px; }
 
         .toast {
           display: flex;
           align-items: flex-start;
           gap: 12px;
           padding: 16px;
-          background: white;
+          background: #fff;
           border-radius: 12px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05);
           min-width: 320px;
           max-width: 420px;
           pointer-events: all;
@@ -211,96 +238,45 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
         }
 
         @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(100%) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
+          from { opacity: 0; transform: translateX(100%) scale(0.95); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
         }
 
-        /* Animações para diferentes posições */
         .toast-position-top-left .toast,
         .toast-position-bottom-left .toast {
           animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
         @keyframes slideInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-100%) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
+          from { opacity: 0; transform: translateX(-100%) scale(0.95); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
         }
 
         .toast-position-bottom-right .toast,
         .toast-position-bottom-left .toast {
           animation: slideInBottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
         @keyframes slideInBottom {
-          from {
-            opacity: 0;
-            transform: translateY(20px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         .toast:hover {
           transform: translateX(-4px);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+          box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.08);
         }
-
         .toast-position-top-left .toast:hover,
         .toast-position-bottom-left .toast:hover {
           transform: translateX(4px);
         }
 
-        .toast-success {
-          border-left-color: #10B981;
-        }
+        .toast-success { border-left-color: #10B981; }
+        .toast-error { border-left-color: #EF4444; }
+        .toast-warning { border-left-color: #F59E0B; }
+        .toast-info { border-left-color: #3B82F6; }
 
-        .toast-error {
-          border-left-color: #EF4444;
-        }
-
-        .toast-warning {
-          border-left-color: #F59E0B;
-        }
-
-        .toast-info {
-          border-left-color: #3B82F6;
-        }
-
-        .toast-icon {
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-top: 2px;
-        }
-
-        .toast-content {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .toast-message {
-          color: #2D1F3E;
-          font-size: 14px;
-          line-height: 1.5;
-          font-weight: 500;
-          margin: 0;
-          word-wrap: break-word;
-        }
+        .toast-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+        .toast-content { flex: 1; min-width: 0; }
+        .toast-message { color: #2D1F3E; font-size: 14px; line-height: 1.5; font-weight: 500; margin: 0; word-wrap: break-word; }
 
         .toast-close {
           flex-shrink: 0;
@@ -316,44 +292,18 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
           transition: all 0.2s ease;
           margin-top: 2px;
         }
+        .toast-close:hover { background: rgba(139,122,184,0.1); color: #2D1F3E; }
+        .toast-close:active { transform: scale(0.95); }
 
-        .toast-close:hover {
-          background: rgba(139, 122, 184, 0.1);
-          color: #2D1F3E;
-        }
-
-        .toast-close:active {
-          transform: scale(0.95);
-        }
-
-        /* Responsivo */
         @media (max-width: 640px) {
-          .toast-container {
-            left: 16px !important;
-            right: 16px !important;
-          }
-
-          .toast-position-top-right,
-          .toast-position-top-left {
-            top: 20px;
-          }
-
-          .toast-position-bottom-right,
-          .toast-position-bottom-left {
-            bottom: 20px;
-          }
-
-          .toast {
-            min-width: auto;
-            max-width: 100%;
-          }
+          .toast-container { left: 16px !important; right: 16px !important; }
+          .toast-position-top-right, .toast-position-top-left { top: 20px; }
+          .toast-position-bottom-right, .toast-position-bottom-left { bottom: 20px; }
+          .toast { min-width: auto; max-width: 100%; }
         }
 
-        /* Acessibilidade - reduzir movimento */
         @media (prefers-reduced-motion: reduce) {
-          .toast {
-            animation: none;
-          }
+          .toast { animation: none; }
         }
       `}</style>
     </ToastContext.Provider>
