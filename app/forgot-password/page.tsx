@@ -32,8 +32,9 @@ export default function ForgotPasswordPage() {
       if (error) throw error
       showToast('Enviamos um link para redefinir sua senha (verifique o e-mail).', 'success')
       setEmail('')
-    } catch (err: any) {
-      showToast(err?.message || 'Não foi possível enviar o e-mail. Tente novamente.', 'error')
+    } catch (err: unknown) {
+      const error = err as Error
+      showToast(error?.message || 'Não foi possível enviar o e-mail. Tente novamente.', 'error')
     } finally {
       setLoading(false)
     }

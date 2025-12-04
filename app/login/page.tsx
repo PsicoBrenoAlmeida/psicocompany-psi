@@ -93,13 +93,14 @@ export default function LoginPage() {
         router.refresh() // Força atualização da sessão
       }, 500)
       
-    } catch (err: any) {
-      console.error('❌ Erro catch:', err) // Debug
-      showToast(err?.message || 'Ocorreu um erro ao fazer login. Tente novamente.', 'error')
-    } finally {
-      // Garante que loading seja resetado SEMPRE
-      setLoading(false)
-    }
+    } catch (err: unknown) {
+    const error = err as Error
+    console.error('❌ Erro catch:', error) // Debug
+    showToast(error?.message || 'Ocorreu um erro ao fazer login. Tente novamente.', 'error')
+  } finally {
+    // Garante que loading seja resetado SEMPRE
+    setLoading(false)
+  }
   }
 
   return (

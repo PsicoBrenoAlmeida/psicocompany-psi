@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabaseClient'
 import { useToast } from '@/components/ui/Toast'
 
 export default function ResetPasswordPage() {
   const supabase = createClient()
   const router = useRouter()
-  const params = useSearchParams()
   const { showToast } = useToast()
 
   const [password, setPassword] = useState('')
@@ -41,14 +40,15 @@ export default function ResetPasswordPage() {
 
     try {
       setLoading(true)
-      const { data: { user }, error } = await supabase.auth.updateUser({ password })
+      const { error } = await supabase.auth.updateUser({ password })
 
       if (error) throw error
 
       showToast('Senha redefinida com sucesso! Faça login novamente.', 'success')
       setTimeout(() => router.push('/login'), 800)
-    } catch (err: any) {
-      showToast(err?.message || 'Erro ao redefinir senha', 'error')
+    } catch (err: unknown) {
+      const error = err as Error
+      showToast(error?.message || 'Erro ao redefinir senha', 'error')
     } finally {
       setLoading(false)
     }
@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
     return (
       <main className="mx-auto max-w-lg px-6 py-12 text-center">
         <h2 className="text-xl font-bold mb-3">Token inválido ou expirado</h2>
-        <p className="text-gray-600 mb-6">Clique em "esqueci a senha" novamente para gerar um novo link.</p>
+        <p className="text-gray-600 mb-6">Clique em &quot;esqueci a senha&quot; novamente para gerar um novo link.</p>
         <a href="/forgot-password" className="text-violet-600 font-semibold underline">
           Gerar novo link
         </a>
