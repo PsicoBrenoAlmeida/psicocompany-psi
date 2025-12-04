@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabaseClient'
@@ -107,61 +107,72 @@ export default function AlterarCadastroParte1() {
     'Psicodrama'
   ]
 
-  const loadUserData = useCallback(async () => {
-    try {
-      setInitialLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      setUserId(user.id)
-      setEmail(user.email || '')
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (profileData) {
-        setFullName(profileData.full_name || '')
-        setPhone(profileData.phone || '')
-      }
-
-      const { data: psychData } = await supabase
-        .from('psychologists')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (psychData) {
-        setSpecialties(psychData.specialties || [])
-        setApproaches(psychData.approaches || [])
-        setShortBio(psychData.short_bio || '')
-        setFullBio(psychData.full_bio || '')
-        setEducationList(psychData.education_list || [])
-        setPricePerSession(psychData.price_per_session?.toString() || '')
-        setSessionDuration(psychData.session_duration?.toString() || '50')
-        setCrpNumber(psychData.crp || '')
-        setGender(psychData.gender || '')
-        setRace(psychData.race || '')
-        setSexualOrientation(psychData.sexual_orientation || '')
-        setPronouns(psychData.pronouns || '')
-        setCurrentPlan(psychData.plan_type || 'basic')
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error)
-    } finally {
-      setInitialLoading(false)
-    }
-  }, [router, supabase])
-
+  // ✅ CORRIGIDO: useEffect sem loop infinito
   useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        console.log('📥 Carregando dados do usuário...')
+        setInitialLoading(true)
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+          console.log('❌ Usuário não autenticado')
+          router.push('/login')
+          return
+        }
+
+        console.log('✅ Usuário encontrado:', user.id)
+        setUserId(user.id)
+        setEmail(user.email || '')
+
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        console.log('📋 Profile data:', profileData)
+
+        if (profileData) {
+          setFullName(profileData.full_name || '')
+          setPhone(profileData.phone || '')
+        }
+
+        const { data: psychData } = await supabase
+          .from('psychologists')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        console.log('🧠 Psych data:', psychData)
+
+        if (psychData) {
+          setSpecialties(psychData.specialties || [])
+          setApproaches(psychData.approaches || [])
+          setShortBio(psychData.short_bio || '')
+          setFullBio(psychData.full_bio || '')
+          setEducationList(psychData.education_list || [])
+          setPricePerSession(psychData.price_per_session?.toString() || '')
+          setSessionDuration(psychData.session_duration?.toString() || '50')
+          setCrpNumber(psychData.crp || '')
+          setGender(psychData.gender || '')
+          setRace(psychData.race || '')
+          setSexualOrientation(psychData.sexual_orientation || '')
+          setPronouns(psychData.pronouns || '')
+          setCurrentPlan(psychData.plan_type || 'basic')
+        }
+
+        console.log('✅ Dados carregados com sucesso!')
+      } catch (error) {
+        console.error('🔴 Erro ao carregar dados:', error)
+      } finally {
+        setInitialLoading(false)
+      }
+    }
+
     loadUserData()
-  }, [loadUserData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // ← Executa APENAS 1 vez
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '')
@@ -254,14 +265,18 @@ export default function AlterarCadastroParte1() {
 
   const handleSave = async () => {
     try {
+      console.log('💾 Iniciando salvamento...')
       setLoading(true)
       setMessage(null)
 
       // VALIDAR PLANO
+      console.log('🔍 Validando plano...')
       if (!validatePremiumFeatures()) {
         setLoading(false)
         return
       }
+
+      console.log('✅ Plano validado')
 
       // Validações básicas
       if (!fullName.trim()) {
@@ -289,9 +304,11 @@ export default function AlterarCadastroParte1() {
         throw new Error('Adicione pelo menos uma formação')
       }
 
-      console.log('💾 Salvando Parte 1...')
+      console.log('✅ Validações OK')
+      console.log('👤 UserID:', userId)
 
       // Atualizar perfil
+      console.log('📝 Atualizando profiles...')
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -299,45 +316,69 @@ export default function AlterarCadastroParte1() {
           phone: phone
         })
         .eq('user_id', userId)
+        .select()    // ← ADICIONE
+        .single()    // ← ADICIONE
 
-      if (profileError) throw profileError
+      console.log('📝 Update profiles completou! Erro?', profileError)
+
+      if (profileError) {
+        console.error('❌ Erro ao atualizar profiles:', profileError)
+        throw profileError
+      }
+      console.log('✅ Profiles atualizado')
 
       // Atualizar dados do psicólogo
+      console.log('🧠 Atualizando psychologists...')
       const price = Number(pricePerSession)
       const duration = Number(sessionDuration || 50)
       
+      const updateData = {
+        crp: crpNumber,
+        specialties,
+        approaches,
+        short_bio: shortBio,
+        full_bio: fullBio,
+        education_list: educationList,
+        price_per_session: price,
+        session_duration: duration,
+        gender: gender || null,
+        race: race || null,
+        sexual_orientation: sexualOrientation || null,
+        pronouns: pronouns || null
+      }
+
+      console.log('📦 Dados a serem salvos:', updateData)
+
       const { error: psychError } = await supabase
-        .from('psychologists')
-        .update({
-          crp: crpNumber,
-          specialties,
-          approaches,
-          short_bio: shortBio,
-          full_bio: fullBio,
-          education_list: educationList,
-          price_per_session: price,
-          session_duration: duration,
-          gender: gender || null,
-          race: race || null,
-          sexual_orientation: sexualOrientation || null,
-          pronouns: pronouns || null
-        })
-        .eq('user_id', userId)
+      .from('psychologists')
+      .update(updateData)
+      .eq('user_id', userId)
+      .select()    // ← ADICIONE
+      .single()    // ← ADICIONE
 
-      if (psychError) throw psychError
+    console.log('🧠 Update psychologists completou! Erro?', psychError) // ← ADICIONE
 
-      console.log('✅ Parte 1 salva!')
+      if (psychError) {
+        console.error('❌ Erro ao atualizar psychologists:', psychError)
+        throw psychError
+      }
+
+      console.log('✅ Psychologists atualizado')
+      console.log('🎉 Parte 1 salva com sucesso!')
+      
       setMessage({ type: 'success', text: '✓ Dados salvos! Continuando para Parte 2...' })
 
       setTimeout(() => {
+        console.log('🚀 Redirecionando para Parte 2...')
         router.push('/alterar-cadastro/parte-2')
       }, 1500)
 
     } catch (error) {
-      console.error('🔴 ERRO:', error)
+      console.error('🔴 ERRO COMPLETO:', error)
       const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar'
       setMessage({ type: 'error', text: errorMessage })
     } finally {
+      console.log('🏁 Finally - resetando loading')
       setLoading(false)
     }
   }
